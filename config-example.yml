@@ -1,5 +1,5 @@
-instance_name: "My Home Hub"
-password: "" #leave blank for password less access
+instance_name: "Familty Home Hub"
+#password: "" #leave blank for password less access
 admin_name: "Administrator"
 feature_toggles:
   shopping_list: true
@@ -11,18 +11,27 @@ feature_toggles:
   who_is_home: true
   personal_status: true
   chores: true
-  recipes: true
-  expiry_tracker: true
+  recipes: false
+  expiry_tracker: false
   url_shortener: true
-  expense_tracker: true
+  expense_tracker: false
   bitwarden: true
+  games: true
+  file_converter: true
+  dev_tools: true
+  photo_gallery: true
+  meal_planner: true
+  maintenance_log: true
+  pet_care: true
+  weather: true
+  countdown_timers: true
 
 family_members:
   - Mom
   - Dad
-  - Dipanshu
-  - Vivek
-  - India
+  - Kid1
+  - Kid2
+  - Kid3
 
 who_is_home_statuses:
   - Home
@@ -30,6 +39,8 @@ who_is_home_statuses:
   - Out
   - Traveling
   - School
+  - Baseball
+  - Social
 
 reminders:
   # time_format controls how reminder times are displayed in the UI.
@@ -37,10 +48,10 @@ reminders:
   time_format: 12h
 
   # calendar_start_day controls which day the reminders calendar starts on.
-  # Accepts full weekday names (sunday..saturday) or numeric 0-6 where 0=Sunday.  
+  # Accepts full weekday names (sunday..saturday) or numeric 0-6 where 0=Sunday.
   calendar_start_day: sunday #default is Sunday
 
-  # Example reminder categories (keys lowercase no spaces recommended)
+    # Example reminder categories (keys lowercase no spaces recommended)
   categories:
     - key: health
       label: Health
@@ -54,14 +65,22 @@ reminders:
     - key: family
       label: Family
       color: "#2563eb"
+    - key: baseball
+      label: Baseball
+      color: "#ffa500"
+    - key: social
+      label: Social
+      color: "#ffff00"
+
 theme:
-  primary_color: "#1d4ed8"
-  secondary_color: "#a0aec0"
-  background_color: "#f7fafc"
-  card_background_color: "#fff"
-  text_color: "#333"
-  sidebar_background_color: "#2563eb"
+  # Money green color scheme with light/dark mode support
+  primary_color: "#10b981"          # Emerald green
+  secondary_color: "#6ee7b7"        # Light green accent
+  background_color: "#f0fdf4"       # Very light green tint
+  card_background_color: "#ffffff"
+  text_color: "#064e3b"             # Dark green text
+  sidebar_background_color: "#047857"  # Rich money green
   sidebar_text_color: "#ffffff"
   sidebar_link_color: "rgba(255,255,255,0.95)"
-  sidebar_link_border_color: "rgba(255,255,255,0.18)"
-  sidebar_active_color: "#3b82f6"
+  sidebar_link_border_color: "rgba(255,255,255,0.15)"
+  sidebar_active_color: "#10b981"   # Bright emerald on hover
