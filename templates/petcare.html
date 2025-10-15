@@ -1,0 +1,254 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="mx-auto max-w-6xl">
+    <div class="flex items-center justify-between mb-6">
+        <h2 class="text-3xl font-bold"><i class="fa-solid fa-paw text-amber-600 mr-2"></i>Pet Care Tracker</h2>
+        <button onclick="showAddPet()" class="btn btn-primary">
+            <i class="fa-solid fa-plus mr-2"></i>Add Pet
+        </button>
+    </div>
+
+    <!-- Pets List -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
+        {% for pet in pets %}
+        <div class="card p-6 hover:shadow-2xl transition-all">
+            <div class="flex justify-between items-start mb-4">
+                <div class="flex items-center gap-3">
+                    <div class="w-16 h-16 rounded-full bg-gradient-to-br from-purple-400 to-pink-400 flex items-center justify-center text-3xl text-white">
+                        <i class="fa-solid fa-{{ pet.icon or 'paw' }}"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-xl font-bold">{{ pet.name }}</h3>
+                        <p class="text-sm text-gray-600">{{ pet.species }} • {{ pet.breed or 'Mixed' }}</p>
+                    </div>
+                </div>
+                <button onclick="deletePet({{ pet.id }})" class="text-red-600 hover:text-red-800">
+                    <i class="fa-solid fa-trash"></i>
+                </button>
+            </div>
+
+            {% if pet.birth_date %}
+            <p class="text-sm text-gray-600 mb-3">
+                <i class="fa-solid fa-birthday-cake mr-1"></i>Age: {{ pet.age }} years old
+            </p>
+            {% endif %}
+
+            <button onclick="showCareLog({{ pet.id }}, '{{ pet.name }}')" class="btn btn-primary w-full">
+                <i class="fa-solid fa-clipboard-list mr-2"></i>View Care Log
+            </button>
+        </div>
+        {% else %}
+        <div class="col-span-full text-center py-12 text-gray-500">
+            <i class="fa-solid fa-paw text-6xl mb-4"></i>
+            <p>No pets added yet. Add your furry friends to track their care!</p>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Care Events (shown when pet selected) -->
+    <div id="careLog" class="hidden">
+        <div class="card p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold"><span id="petNameTitle"></span>'s Care Log</h3>
+                <div class="flex gap-2">
+                    <button onclick="showAddEvent()" class="btn btn-primary">
+                        <i class="fa-solid fa-plus mr-1"></i>Add Event
+                    </button>
+                    <button onclick="hideCareLog()" class="btn">
+                        <i class="fa-solid fa-times mr-1"></i>Close
+                    </button>
+                </div>
+            </div>
+
+            <div id="careEvents" class="space-y-3"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Pet Modal -->
+<div id="petModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-lg p-6 max-w-md w-full">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-xl font-bold">Add Pet</h3>
+            <button onclick="document.getElementById('petModal').classList.add('hidden')" class="text-gray-500 hover:text-gray-700">
+                <i class="fa-solid fa-times text-2xl"></i>
+            </button>
+        </div>
+        <form method="POST" action="/petcare/add">
+            <div class="mb-4">
+                <label class="block font-semibold mb-2">Pet Name</label>
+                <input type="text" name="name" required class="w-full p-2 border rounded" placeholder="e.g., Buddy">
+            </div>
+            <div class="grid grid-cols-2 gap-4 mb-4">
+                <div>
+                    <label class="block font-semibold mb-2">Species</label>
+                    <select name="species" class="w-full p-2 border rounded">
+                        <option value="Dog">Dog</option>
+                        <option value="Cat">Cat</option>
+                        <option value="Bird">Bird</option>
+                        <option value="Fish">Fish</option>
+                        <option value="Rabbit">Rabbit</option>
+                        <option value="Hamster">Hamster</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block font-semibold mb-2">Icon</label>
+                    <select name="icon" class="w-full p-2 border rounded">
+                        <option value="dog">Dog</option>
+                        <option value="cat">Cat</option>
+                        <option value="dove">Bird</option>
+                        <option value="fish">Fish</option>
+                        <option value="paw">Paw</option>
+                    </select>
+                </div>
+            </div>
+            <div class="mb-4">
+                <label class="block font-semibold mb-2">Breed (Optional)</label>
+                <input type="text" name="breed" class="w-full p-2 border rounded" placeholder="e.g., Golden Retriever">
+            </div>
+            <div class="mb-4">
+                <label class="block font-semibold mb-2">Birth Date (Optional)</label>
+                <input type="date" name="birth_date" class="w-full p-2 border rounded">
+            </div>
+            <input type="hidden" name="creator" id="petCreator">
+            <div class="flex gap-2">
+                <button type="submit" class="btn btn-primary flex-1">Add Pet</button>
+                <button type="button" onclick="document.getElementById('petModal').classList.add('hidden')" class="btn flex-1">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Add Care Event Modal -->
+<div id="eventModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-lg p-6 max-w-md w-full">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-xl font-bold">Add Care Event</h3>
+            <button onclick="document.getElementById('eventModal').classList.add('hidden')" class="text-gray-500 hover:text-gray-700">
+                <i class="fa-solid fa-times text-2xl"></i>
+            </button>
+        </div>
+        <form method="POST" action="/petcare/event/add">
+            <input type="hidden" name="pet_id" id="eventPetId">
+            <div class="mb-4">
+                <label class="block font-semibold mb-2">Event Type</label>
+                <select name="event_type" class="w-full p-2 border rounded">
+                    <option value="Vet Visit">Vet Visit</option>
+                    <option value="Vaccination">Vaccination</option>
+                    <option value="Medication">Medication</option>
+                    <option value="Grooming">Grooming</option>
+                    <option value="Feeding">Feeding Schedule</option>
+                    <option value="Training">Training</option>
+                    <option value="Other">Other</option>
+                </select>
+            </div>
+            <div class="mb-4">
+                <label class="block font-semibold mb-2">Description</label>
+                <textarea name="description" required class="w-full p-2 border rounded" rows="3" placeholder="Details about this care event..."></textarea>
+            </div>
+            <div class="mb-4">
+                <label class="block font-semibold mb-2">Date</label>
+                <input type="date" name="event_date" required class="w-full p-2 border rounded">
+            </div>
+            <div class="mb-4">
+                <label class="block font-semibold mb-2">Next Due Date (Optional)</label>
+                <input type="date" name="next_due" class="w-full p-2 border rounded">
+                <p class="text-xs text-gray-500 mt-1">For recurring events like vaccinations</p>
+            </div>
+            <input type="hidden" name="creator" id="eventCreator">
+            <div class="flex gap-2">
+                <button type="submit" class="btn btn-primary flex-1">Add Event</button>
+                <button type="button" onclick="document.getElementById('eventModal').classList.add('hidden')" class="btn flex-1">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+document.getElementById('petCreator').value = localStorage.getItem('username');
+document.getElementById('eventCreator').value = localStorage.getItem('username');
+
+let currentPetId = null;
+
+function showAddPet() {
+    document.getElementById('petModal').classList.remove('hidden');
+}
+
+function showCareLog(petId, petName) {
+    currentPetId = petId;
+    document.getElementById('petNameTitle').textContent = petName;
+    document.getElementById('careLog').classList.remove('hidden');
+    loadCareEvents(petId);
+}
+
+function hideCareLog() {
+    document.getElementById('careLog').classList.add('hidden');
+    currentPetId = null;
+}
+
+function showAddEvent() {
+    if (!currentPetId) return;
+    document.getElementById('eventPetId').value = currentPetId;
+    document.querySelector('input[name="event_date"]').value = new Date().toISOString().split('T')[0];
+    document.getElementById('eventModal').classList.remove('hidden');
+}
+
+function loadCareEvents(petId) {
+    fetch(`/petcare/events/${petId}`)
+        .then(r => r.json())
+        .then(events => {
+            const container = document.getElementById('careEvents');
+            if (events.length === 0) {
+                container.innerHTML = '<p class="text-center text-gray-500 py-8">No care events recorded yet.</p>';
+                return;
+            }
+
+            container.innerHTML = events.map(e => `
+                <div class="card p-4 bg-gray-50">
+                    <div class="flex justify-between items-start">
+                        <div class="flex-1">
+                            <div class="flex items-center gap-2 mb-1">
+                                <span class="px-2 py-1 bg-blue-600 text-white text-xs rounded">${e.event_type}</span>
+                                <span class="text-sm text-gray-500">${e.event_date}</span>
+                            </div>
+                            <p class="text-sm">${e.description}</p>
+                            ${e.next_due ? `<p class="text-xs text-orange-600 mt-2"><i class="fa-solid fa-clock mr-1"></i>Next due: ${e.next_due}</p>` : ''}
+                        </div>
+                        <button onclick="deleteEvent(${e.id})" class="text-red-600 hover:text-red-800">
+                            <i class="fa-solid fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        });
+}
+
+function deletePet(id) {
+    if (!confirm('Delete this pet and all their care records?')) return;
+
+    const formData = new FormData();
+    formData.append('user', localStorage.getItem('username'));
+
+    fetch(`/petcare/delete/${id}`, { method: 'POST', body: formData })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            }
+        });
+}
+
+function deleteEvent(id) {
+    if (!confirm('Delete this care event?')) return;
+
+    fetch(`/petcare/event/delete/${id}`, { method: 'POST' })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                loadCareEvents(currentPetId);
+            }
+        });
+}
+</script>
+{% endblock %}

@@ -1,0 +1,433 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="mx-auto">
+    <div class="flex items-center justify-between mb-6">
+        <h2 class="text-3xl font-bold"><i class="fa-solid fa-code text-purple-600 mr-2"></i>Development Tools</h2>
+    </div>
+
+    <!-- Tab Navigation -->
+    <div class="card p-1 mb-6 flex flex-wrap gap-2">
+        <button onclick="switchTool('markdown')" id="tab-markdown" class="tool-tab px-4 py-2 rounded-lg font-semibold transition-all">
+            <i class="fa-brands fa-markdown mr-2"></i>Markdown Editor
+        </button>
+        <button onclick="switchTool('formatter')" id="tab-formatter" class="tool-tab px-4 py-2 rounded-lg font-semibold transition-all">
+            <i class="fa-solid fa-code mr-2"></i>JSON/YAML Formatter
+        </button>
+        <button onclick="switchTool('converter')" id="tab-converter" class="tool-tab px-4 py-2 rounded-lg font-semibold transition-all">
+            <i class="fa-solid fa-ruler mr-2"></i>Unit Converter
+        </button>
+        <button onclick="switchTool('base64')" id="tab-base64" class="tool-tab px-4 py-2 rounded-lg font-semibold transition-all">
+            <i class="fa-solid fa-lock mr-2"></i>Base64 Encoder/Decoder
+        </button>
+        <button onclick="switchTool('color')" id="tab-color" class="tool-tab px-4 py-2 rounded-lg font-semibold transition-all">
+            <i class="fa-solid fa-palette mr-2"></i>Color Picker
+        </button>
+    </div>
+
+    <!-- Markdown Editor -->
+    <div id="tool-markdown" class="tool-panel hidden">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="card p-4">
+                <h3 class="font-bold mb-2 flex items-center gap-2">
+                    <i class="fa-solid fa-pencil text-blue-600"></i>Markdown Input
+                </h3>
+                <textarea id="markdown-input" class="w-full p-3 border rounded-lg font-mono text-sm" rows="20" placeholder="# Enter markdown here..."></textarea>
+            </div>
+            <div class="card p-4">
+                <h3 class="font-bold mb-2 flex items-center gap-2">
+                    <i class="fa-solid fa-eye text-green-600"></i>Preview
+                </h3>
+                <div id="markdown-preview" class="w-full p-3 border rounded-lg prose prose-sm max-w-none min-h-[500px]"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- JSON/YAML Formatter -->
+    <div id="tool-formatter" class="tool-panel hidden">
+        <div class="card p-4 mb-4">
+            <div class="flex gap-2 mb-3">
+                <button onclick="formatJson()" class="btn btn-primary"><i class="fa-solid fa-check mr-1"></i>Format JSON</button>
+                <button onclick="formatYaml()" class="btn btn-primary"><i class="fa-solid fa-check mr-1"></i>Format YAML</button>
+                <button onclick="minifyJson()" class="btn"><i class="fa-solid fa-compress mr-1"></i>Minify JSON</button>
+                <button onclick="convertJsonToYaml()" class="btn"><i class="fa-solid fa-arrow-right mr-1"></i>JSON → YAML</button>
+                <button onclick="convertYamlToJson()" class="btn"><i class="fa-solid fa-arrow-left mr-1"></i>YAML → JSON</button>
+            </div>
+            <textarea id="formatter-input" class="w-full p-3 border rounded-lg font-mono text-sm" rows="20" placeholder='{"key": "value"}'></textarea>
+            <div id="formatter-error" class="mt-2 text-red-600 text-sm hidden"></div>
+        </div>
+    </div>
+
+    <!-- Unit Converter -->
+    <div id="tool-converter" class="tool-panel hidden">
+        <div class="card p-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <label class="block font-semibold mb-2">Category</label>
+                    <select id="unit-category" onchange="updateUnitSelects()" class="w-full p-2 border rounded-lg">
+                        <option value="length">Length</option>
+                        <option value="weight">Weight</option>
+                        <option value="temperature">Temperature</option>
+                        <option value="volume">Volume</option>
+                        <option value="area">Area</option>
+                        <option value="speed">Speed</option>
+                        <option value="time">Time</option>
+                    </select>
+                </div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                <div class="card p-4 bg-blue-50">
+                    <label class="block font-semibold mb-2">From</label>
+                    <select id="unit-from" class="w-full p-2 border rounded-lg mb-3"></select>
+                    <input type="number" id="value-from" oninput="convertUnits()" class="w-full p-3 border rounded-lg text-lg" placeholder="Enter value">
+                </div>
+                <div class="card p-4 bg-green-50">
+                    <label class="block font-semibold mb-2">To</label>
+                    <select id="unit-to" class="w-full p-2 border rounded-lg mb-3"></select>
+                    <input type="text" id="value-to" readonly class="w-full p-3 border rounded-lg text-lg bg-white font-bold" placeholder="Result">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Base64 Encoder/Decoder -->
+    <div id="tool-base64" class="tool-panel hidden">
+        <div class="card p-4">
+            <div class="flex gap-2 mb-3">
+                <button onclick="encodeBase64()" class="btn btn-primary"><i class="fa-solid fa-lock mr-1"></i>Encode to Base64</button>
+                <button onclick="decodeBase64()" class="btn btn-primary"><i class="fa-solid fa-unlock mr-1"></i>Decode from Base64</button>
+            </div>
+            <textarea id="base64-input" class="w-full p-3 border rounded-lg font-mono text-sm mb-4" rows="10" placeholder="Enter text to encode or Base64 to decode..."></textarea>
+            <div class="bg-gray-50 p-4 rounded-lg">
+                <h3 class="font-semibold mb-2">Result:</h3>
+                <div id="base64-output" class="p-3 bg-white border rounded font-mono text-sm break-all min-h-[100px]"></div>
+            </div>
+            <div id="base64-error" class="mt-2 text-red-600 text-sm hidden"></div>
+        </div>
+    </div>
+
+    <!-- Color Picker -->
+    <div id="tool-color" class="tool-panel hidden">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="card p-6">
+                <h3 class="font-bold mb-4 text-lg">Color Picker</h3>
+                <div class="mb-6">
+                    <label class="block font-semibold mb-2">Pick a Color</label>
+                    <input type="color" id="color-picker" oninput="updateColorInfo()" class="w-full h-24 rounded-lg cursor-pointer">
+                </div>
+                <div class="space-y-3">
+                    <div>
+                        <label class="block text-sm font-semibold mb-1">HEX</label>
+                        <input type="text" id="color-hex" oninput="updateFromHex()" class="w-full p-2 border rounded font-mono">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold mb-1">RGB</label>
+                        <input type="text" id="color-rgb" readonly class="w-full p-2 border rounded font-mono bg-gray-50">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold mb-1">HSL</label>
+                        <input type="text" id="color-hsl" readonly class="w-full p-2 border rounded font-mono bg-gray-50">
+                    </div>
+                </div>
+            </div>
+            <div class="card p-6">
+                <h3 class="font-bold mb-4 text-lg">Color Palette Generator</h3>
+                <div class="mb-4">
+                    <button onclick="generatePalette('complementary')" class="btn btn-primary mr-2 mb-2">Complementary</button>
+                    <button onclick="generatePalette('analogous')" class="btn btn-primary mr-2 mb-2">Analogous</button>
+                    <button onclick="generatePalette('triadic')" class="btn btn-primary mb-2">Triadic</button>
+                </div>
+                <div id="color-palette" class="grid grid-cols-5 gap-2"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/js-yaml@4.1.0/dist/js-yaml.min.js"></script>
+<script>
+// Tab switching
+function switchTool(tool) {
+    document.querySelectorAll('.tool-panel').forEach(p => p.classList.add('hidden'));
+    document.querySelectorAll('.tool-tab').forEach(t => {
+        t.classList.remove('bg-blue-600', 'text-white');
+        t.classList.add('hover:bg-gray-100');
+    });
+    document.getElementById('tool-' + tool).classList.remove('hidden');
+    const tab = document.getElementById('tab-' + tool);
+    tab.classList.add('bg-blue-600', 'text-white');
+    tab.classList.remove('hover:bg-gray-100');
+}
+
+// Markdown Editor
+document.getElementById('markdown-input')?.addEventListener('input', function() {
+    const markdown = this.value;
+    document.getElementById('markdown-preview').innerHTML = marked.parse(markdown);
+});
+
+// JSON/YAML Formatter
+function formatJson() {
+    try {
+        const input = document.getElementById('formatter-input').value;
+        const parsed = JSON.parse(input);
+        document.getElementById('formatter-input').value = JSON.stringify(parsed, null, 2);
+        document.getElementById('formatter-error').classList.add('hidden');
+    } catch (e) {
+        document.getElementById('formatter-error').textContent = 'Error: ' + e.message;
+        document.getElementById('formatter-error').classList.remove('hidden');
+    }
+}
+
+function minifyJson() {
+    try {
+        const input = document.getElementById('formatter-input').value;
+        const parsed = JSON.parse(input);
+        document.getElementById('formatter-input').value = JSON.stringify(parsed);
+        document.getElementById('formatter-error').classList.add('hidden');
+    } catch (e) {
+        document.getElementById('formatter-error').textContent = 'Error: ' + e.message;
+        document.getElementById('formatter-error').classList.remove('hidden');
+    }
+}
+
+function formatYaml() {
+    try {
+        const input = document.getElementById('formatter-input').value;
+        const parsed = jsyaml.load(input);
+        document.getElementById('formatter-input').value = jsyaml.dump(parsed, { indent: 2 });
+        document.getElementById('formatter-error').classList.add('hidden');
+    } catch (e) {
+        document.getElementById('formatter-error').textContent = 'Error: ' + e.message;
+        document.getElementById('formatter-error').classList.remove('hidden');
+    }
+}
+
+function convertJsonToYaml() {
+    try {
+        const input = document.getElementById('formatter-input').value;
+        const parsed = JSON.parse(input);
+        document.getElementById('formatter-input').value = jsyaml.dump(parsed, { indent: 2 });
+        document.getElementById('formatter-error').classList.add('hidden');
+    } catch (e) {
+        document.getElementById('formatter-error').textContent = 'Error: ' + e.message;
+        document.getElementById('formatter-error').classList.remove('hidden');
+    }
+}
+
+function convertYamlToJson() {
+    try {
+        const input = document.getElementById('formatter-input').value;
+        const parsed = jsyaml.load(input);
+        document.getElementById('formatter-input').value = JSON.stringify(parsed, null, 2);
+        document.getElementById('formatter-error').classList.add('hidden');
+    } catch (e) {
+        document.getElementById('formatter-error').textContent = 'Error: ' + e.message;
+        document.getElementById('formatter-error').classList.remove('hidden');
+    }
+}
+
+// Unit Converter
+const unitData = {
+    length: { meter: 1, kilometer: 0.001, centimeter: 100, millimeter: 1000, mile: 0.000621371, yard: 1.09361, foot: 3.28084, inch: 39.3701 },
+    weight: { kilogram: 1, gram: 1000, milligram: 1000000, pound: 2.20462, ounce: 35.274, ton: 0.001 },
+    temperature: { celsius: 1, fahrenheit: 1, kelvin: 1 },
+    volume: { liter: 1, milliliter: 1000, gallon: 0.264172, quart: 1.05669, pint: 2.11338, cup: 4.22675, tablespoon: 67.628, teaspoon: 202.884 },
+    area: { 'sq meter': 1, 'sq kilometer': 0.000001, 'sq centimeter': 10000, 'sq mile': 3.861e-7, 'sq yard': 1.19599, 'sq foot': 10.7639, 'sq inch': 1550, acre: 0.000247105, hectare: 0.0001 },
+    speed: { 'meter/sec': 1, 'kilometer/hr': 3.6, 'mile/hr': 2.23694, 'foot/sec': 3.28084, knot: 1.94384 },
+    time: { second: 1, minute: 0.0166667, hour: 0.000277778, day: 0.0000115741, week: 0.00000165344, month: 3.8052e-7, year: 3.171e-8 }
+};
+
+function updateUnitSelects() {
+    const category = document.getElementById('unit-category').value;
+    const units = Object.keys(unitData[category]);
+    const fromSelect = document.getElementById('unit-from');
+    const toSelect = document.getElementById('unit-to');
+
+    fromSelect.innerHTML = '';
+    toSelect.innerHTML = '';
+
+    units.forEach(unit => {
+        fromSelect.add(new Option(unit, unit));
+        toSelect.add(new Option(unit, unit));
+    });
+
+    if (units.length > 1) toSelect.selectedIndex = 1;
+    convertUnits();
+}
+
+function convertUnits() {
+    const category = document.getElementById('unit-category').value;
+    const fromUnit = document.getElementById('unit-from').value;
+    const toUnit = document.getElementById('unit-to').value;
+    const value = parseFloat(document.getElementById('value-from').value);
+
+    if (isNaN(value)) {
+        document.getElementById('value-to').value = '';
+        return;
+    }
+
+    let result;
+    if (category === 'temperature') {
+        result = convertTemperature(value, fromUnit, toUnit);
+    } else {
+        const fromFactor = unitData[category][fromUnit];
+        const toFactor = unitData[category][toUnit];
+        result = (value / fromFactor) * toFactor;
+    }
+
+    document.getElementById('value-to').value = result.toFixed(6);
+}
+
+function convertTemperature(value, from, to) {
+    if (from === to) return value;
+    let celsius;
+    if (from === 'celsius') celsius = value;
+    else if (from === 'fahrenheit') celsius = (value - 32) * 5/9;
+    else celsius = value - 273.15;
+
+    if (to === 'celsius') return celsius;
+    else if (to === 'fahrenheit') return (celsius * 9/5) + 32;
+    else return celsius + 273.15;
+}
+
+// Base64 Encoder/Decoder
+function encodeBase64() {
+    try {
+        const input = document.getElementById('base64-input').value;
+        const encoded = btoa(unescape(encodeURIComponent(input)));
+        document.getElementById('base64-output').textContent = encoded;
+        document.getElementById('base64-error').classList.add('hidden');
+    } catch (e) {
+        document.getElementById('base64-error').textContent = 'Error: ' + e.message;
+        document.getElementById('base64-error').classList.remove('hidden');
+    }
+}
+
+function decodeBase64() {
+    try {
+        const input = document.getElementById('base64-input').value;
+        const decoded = decodeURIComponent(escape(atob(input)));
+        document.getElementById('base64-output').textContent = decoded;
+        document.getElementById('base64-error').classList.add('hidden');
+    } catch (e) {
+        document.getElementById('base64-error').textContent = 'Error: Invalid Base64 string';
+        document.getElementById('base64-error').classList.remove('hidden');
+    }
+}
+
+// Color Picker
+function hexToRgb(hex) {
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return result ? {
+        r: parseInt(result[1], 16),
+        g: parseInt(result[2], 16),
+        b: parseInt(result[3], 16)
+    } : null;
+}
+
+function rgbToHsl(r, g, b) {
+    r /= 255; g /= 255; b /= 255;
+    const max = Math.max(r, g, b), min = Math.min(r, g, b);
+    let h, s, l = (max + min) / 2;
+
+    if (max === min) {
+        h = s = 0;
+    } else {
+        const d = max - min;
+        s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+        switch (max) {
+            case r: h = ((g - b) / d + (g < b ? 6 : 0)) / 6; break;
+            case g: h = ((b - r) / d + 2) / 6; break;
+            case b: h = ((r - g) / d + 4) / 6; break;
+        }
+    }
+
+    return { h: Math.round(h * 360), s: Math.round(s * 100), l: Math.round(l * 100) };
+}
+
+function updateColorInfo() {
+    const hex = document.getElementById('color-picker').value;
+    const rgb = hexToRgb(hex);
+    const hsl = rgbToHsl(rgb.r, rgb.g, rgb.b);
+
+    document.getElementById('color-hex').value = hex;
+    document.getElementById('color-rgb').value = `rgb(${rgb.r}, ${rgb.g}, ${rgb.b})`;
+    document.getElementById('color-hsl').value = `hsl(${hsl.h}, ${hsl.s}%, ${hsl.l}%)`;
+}
+
+function updateFromHex() {
+    const hex = document.getElementById('color-hex').value;
+    if (/^#[0-9A-F]{6}$/i.test(hex)) {
+        document.getElementById('color-picker').value = hex;
+        updateColorInfo();
+    }
+}
+
+function hslToHex(h, s, l) {
+    s /= 100;
+    l /= 100;
+    const c = (1 - Math.abs(2 * l - 1)) * s;
+    const x = c * (1 - Math.abs((h / 60) % 2 - 1));
+    const m = l - c/2;
+    let r = 0, g = 0, b = 0;
+
+    if (0 <= h && h < 60) { r = c; g = x; b = 0; }
+    else if (60 <= h && h < 120) { r = x; g = c; b = 0; }
+    else if (120 <= h && h < 180) { r = 0; g = c; b = x; }
+    else if (180 <= h && h < 240) { r = 0; g = x; b = c; }
+    else if (240 <= h && h < 300) { r = x; g = 0; b = c; }
+    else if (300 <= h && h < 360) { r = c; g = 0; b = x; }
+
+    r = Math.round((r + m) * 255);
+    g = Math.round((g + m) * 255);
+    b = Math.round((b + m) * 255);
+
+    return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+}
+
+function generatePalette(type) {
+    const hex = document.getElementById('color-picker').value;
+    const rgb = hexToRgb(hex);
+    const hsl = rgbToHsl(rgb.r, rgb.g, rgb.b);
+    const palette = [];
+
+    if (type === 'complementary') {
+        palette.push(hex);
+        palette.push(hslToHex((hsl.h + 180) % 360, hsl.s, hsl.l));
+        palette.push(hslToHex(hsl.h, hsl.s, Math.max(0, hsl.l - 20)));
+        palette.push(hslToHex(hsl.h, hsl.s, Math.min(100, hsl.l + 20)));
+        palette.push(hslToHex((hsl.h + 180) % 360, hsl.s, Math.max(0, hsl.l - 20)));
+    } else if (type === 'analogous') {
+        palette.push(hslToHex((hsl.h - 30 + 360) % 360, hsl.s, hsl.l));
+        palette.push(hslToHex((hsl.h - 15 + 360) % 360, hsl.s, hsl.l));
+        palette.push(hex);
+        palette.push(hslToHex((hsl.h + 15) % 360, hsl.s, hsl.l));
+        palette.push(hslToHex((hsl.h + 30) % 360, hsl.s, hsl.l));
+    } else if (type === 'triadic') {
+        palette.push(hex);
+        palette.push(hslToHex((hsl.h + 120) % 360, hsl.s, hsl.l));
+        palette.push(hslToHex((hsl.h + 240) % 360, hsl.s, hsl.l));
+        palette.push(hslToHex(hsl.h, hsl.s, Math.max(0, hsl.l - 20)));
+        palette.push(hslToHex(hsl.h, hsl.s, Math.min(100, hsl.l + 20)));
+    }
+
+    const paletteDiv = document.getElementById('color-palette');
+    paletteDiv.innerHTML = '';
+    palette.forEach(color => {
+        const div = document.createElement('div');
+        div.className = 'h-24 rounded-lg cursor-pointer border-2 border-gray-300 hover:border-gray-500 transition-all';
+        div.style.backgroundColor = color;
+        div.title = color;
+        div.onclick = () => {
+            document.getElementById('color-picker').value = color;
+            updateColorInfo();
+        };
+        paletteDiv.appendChild(div);
+    });
+}
+
+// Initialize
+switchTool('markdown');
+updateUnitSelects();
+updateColorInfo();
+</script>
+{% endblock %}

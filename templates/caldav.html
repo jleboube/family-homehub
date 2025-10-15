@@ -1,0 +1,199 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto space-y-6">
+    <div class="card p-6">
+        <div class="flex items-center justify-between mb-4">
+            <h1 class="text-2xl font-bold">
+                <i class="fa-solid fa-calendar-days text-blue-600 mr-2"></i>
+                iOS Calendar Sync (CalDAV)
+            </h1>
+            <a href="/" class="text-sm text-gray-600 hover:text-gray-800">
+                <i class="fa-solid fa-arrow-left mr-1"></i> Back to Home
+            </a>
+        </div>
+
+        <div class="bg-blue-50 border border-blue-200 rounded p-4 mb-6">
+            <p class="text-sm text-blue-800">
+                <i class="fa-solid fa-info-circle mr-1"></i>
+                <strong>Shared Family Calendar:</strong> This CalDAV connection syncs the HomeHub family calendar with your iOS device. All family reminders will appear in your iOS Calendar app, and any events you create in iOS will be synced back to HomeHub.
+            </p>
+        </div>
+
+        <div class="space-y-6">
+            <!-- Connection Status -->
+            <div>
+                <h2 class="text-lg font-semibold mb-3">
+                    <i class="fa-solid fa-signal text-green-600 mr-2"></i>
+                    Connection Status
+                </h2>
+                <div class="bg-green-50 border border-green-200 rounded p-4">
+                    <p class="text-sm text-green-800">
+                        <i class="fa-solid fa-check-circle mr-1"></i>
+                        CalDAV server is running and ready for sync
+                    </p>
+                    <p class="text-xs text-green-700 mt-2">
+                        Sync occurs every 5 minutes automatically
+                    </p>
+                </div>
+            </div>
+
+            <!-- iOS Setup Instructions -->
+            <div>
+                <h2 class="text-lg font-semibold mb-3">
+                    <i class="fa-brands fa-apple text-gray-600 mr-2"></i>
+                    iOS Setup Instructions
+                </h2>
+                <div class="bg-white border rounded p-4 space-y-3">
+                    <ol class="list-decimal list-inside space-y-3 text-sm">
+                        <li>
+                            <strong>Open Settings</strong> on your iPhone or iPad
+                        </li>
+                        <li>
+                            Tap <strong>Calendar</strong> → <strong>Accounts</strong> → <strong>Add Account</strong>
+                        </li>
+                        <li>
+                            Tap <strong>Other</strong> → <strong>Add CalDAV Account</strong>
+                        </li>
+                        <li>
+                            Enter the following details:
+                            <div class="ml-6 mt-2 space-y-2">
+                                <div class="bg-gray-50 p-3 rounded border">
+                                    <p class="text-xs text-gray-600 mb-1">Server:</p>
+                                    <code class="text-sm font-mono bg-gray-100 px-2 py-1 rounded">{{ server_host }}{% if server_port %}:{{ server_port }}{% endif %}</code>
+                                    <button onclick="copyToClipboard('{{ server_host }}{% if server_port %}:{{ server_port }}{% endif %}')" class="ml-2 text-xs text-blue-600 hover:text-blue-800">
+                                        <i class="fa-solid fa-copy"></i> Copy
+                                    </button>
+                                </div>
+                                <div class="bg-gray-50 p-3 rounded border">
+                                    <p class="text-xs text-gray-600 mb-1">Username:</p>
+                                    <code class="text-sm font-mono bg-gray-100 px-2 py-1 rounded">{{ username }}</code>
+                                    <button onclick="copyToClipboard('{{ username }}')" class="ml-2 text-xs text-blue-600 hover:text-blue-800">
+                                        <i class="fa-solid fa-copy"></i> Copy
+                                    </button>
+                                </div>
+                                <div class="bg-gray-50 p-3 rounded border">
+                                    <p class="text-xs text-gray-600 mb-1">Password:</p>
+                                    <code class="text-sm font-mono bg-gray-100 px-2 py-1 rounded">Your Administrator password</code>
+                                </div>
+                                <div class="bg-gray-50 p-3 rounded border">
+                                    <p class="text-xs text-gray-600 mb-1">Description (optional):</p>
+                                    <code class="text-sm font-mono bg-gray-100 px-2 py-1 rounded">HomeHub Family Calendar</code>
+                                </div>
+                            </div>
+                        </li>
+                        <li>
+                            Tap <strong>Next</strong>
+                        </li>
+                        <li>
+                            Toggle <strong>Calendars</strong> to ON
+                        </li>
+                        <li>
+                            Tap <strong>Save</strong>
+                        </li>
+                    </ol>
+                </div>
+            </div>
+
+            <!-- Important Notes -->
+            <div>
+                <h2 class="text-lg font-semibold mb-3">
+                    <i class="fa-solid fa-exclamation-triangle text-amber-600 mr-2"></i>
+                    Important Notes
+                </h2>
+                <div class="bg-amber-50 border border-amber-200 rounded p-4">
+                    <ul class="list-disc list-inside space-y-2 text-sm text-amber-900">
+                        <li>
+                            <strong>Server Address:</strong> Use the server address shown above exactly as displayed. {% if server_port %}For direct access, include the port number.{% else %}For Cloudflare Tunnel setups, the port is already handled by the tunnel configuration.{% endif %}
+                        </li>
+                        <li>
+                            <strong>HTTP vs HTTPS:</strong> This setup uses HTTP. For production use over the internet, configure HTTPS with a reverse proxy or Cloudflare Tunnel
+                        </li>
+                        <li>
+                            <strong>Sync Frequency:</strong> Changes sync every 5 minutes. You can manually refresh your iOS Calendar to see updates sooner
+                        </li>
+                        <li>
+                            <strong>Shared Calendar:</strong> All family members' reminders from HomeHub will appear in this calendar
+                        </li>
+                        <li>
+                            <strong>Password:</strong> Use your HomeHub Administrator password for CalDAV authentication
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Troubleshooting -->
+            <div>
+                <h2 class="text-lg font-semibold mb-3">
+                    <i class="fa-solid fa-wrench text-gray-600 mr-2"></i>
+                    Troubleshooting
+                </h2>
+                <div class="bg-gray-50 border rounded p-4">
+                    <dl class="space-y-3 text-sm">
+                        <div>
+                            <dt class="font-semibold text-gray-900">Can't connect from iOS:</dt>
+                            <dd class="text-gray-700 ml-4">
+                                - Ensure your iOS device is on the same network as the HomeHub server<br>
+                                - Verify the server address (use IP address instead of localhost)<br>
+                                - Check that port 5232 is not blocked by your firewall
+                            </dd>
+                        </div>
+                        <div>
+                            <dt class="font-semibold text-gray-900">Events not syncing:</dt>
+                            <dd class="text-gray-700 ml-4">
+                                - Wait up to 5 minutes for the next sync cycle<br>
+                                - Pull down to refresh in iOS Calendar app<br>
+                                - Check that the sync service is running (admin should check Docker logs)
+                            </dd>
+                        </div>
+                        <div>
+                            <dt class="font-semibold text-gray-900">Authentication failed:</dt>
+                            <dd class="text-gray-700 ml-4">
+                                - Double-check your Administrator password<br>
+                                - Ensure you're using the correct username ({{ username }})<br>
+                                - Try logging out and back in to HomeHub
+                            </dd>
+                        </div>
+                    </dl>
+                </div>
+            </div>
+
+            <!-- Advanced: Direct CalDAV URL -->
+            <details class="border rounded p-4">
+                <summary class="cursor-pointer font-semibold text-gray-900">
+                    <i class="fa-solid fa-code text-gray-600 mr-2"></i>
+                    Advanced: Direct CalDAV URL
+                </summary>
+                <div class="mt-3 space-y-2">
+                    <p class="text-sm text-gray-700">
+                        For advanced users or third-party calendar apps:
+                    </p>
+                    <div class="bg-gray-100 p-3 rounded border font-mono text-xs break-all">
+                        {{ caldav_url }}
+                    </div>
+                    <button onclick="copyToClipboard('{{ caldav_url }}')" class="btn btn-primary text-xs">
+                        <i class="fa-solid fa-copy mr-1"></i> Copy URL
+                    </button>
+                </div>
+            </details>
+        </div>
+    </div>
+</div>
+
+<script>
+function copyToClipboard(text) {
+    navigator.clipboard.writeText(text).then(() => {
+        if (window.globalToast) {
+            globalToast('Copied to clipboard!', 'success');
+        } else {
+            alert('Copied to clipboard!');
+        }
+    }).catch(err => {
+        console.error('Failed to copy:', err);
+        if (window.globalToast) {
+            globalToast('Failed to copy', 'error');
+        }
+    });
+}
+</script>
+{% endblock %}

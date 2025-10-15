@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="mx-auto">
+    <div class="flex items-center justify-between mb-6">
+        <h2 class="text-3xl font-bold">Games</h2>
+    </div>
+
+    <div class="mb-6 card p-4 bg-blue-50 border-l-4 border-blue-500">
+        <div class="flex items-start gap-3">
+            <i class="fa-solid fa-circle-info text-blue-600 text-xl mt-1"></i>
+            <div>
+                <h3 class="font-semibold text-blue-900 mb-1">Welcome to Games</h3>
+                <p class="text-sm text-blue-800">
+                    Play built-in games like Chess, or add your own HTML5 arcade games to the games/arcade/ directory.
+                    All games run directly in your browser - no downloads or plugins required!
+                </p>
+            </div>
+        </div>
+    </div>
+
+    {% if not game_categories.values()|selectattr('games')|list %}
+    <div class="card p-8 text-center">
+        <i class="fa-solid fa-gamepad text-6xl text-gray-300 mb-4"></i>
+        <h3 class="text-xl font-semibold mb-2">No Games Available</h3>
+        <p class="text-gray-600 mb-4">
+            Add games to the <code class="bg-gray-100 px-2 py-1 rounded">games/</code> directory to get started.
+        </p>
+        <p class="text-sm text-gray-500">
+            Check the <code class="bg-gray-100 px-1 py-0.5 rounded text-xs">games/README.md</code> file for instructions.
+        </p>
+    </div>
+    {% else %}
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {% for category_key, category in game_categories.items() %}
+        {% if category.games %}
+        <div class="card p-6">
+            <div class="flex items-center gap-3 mb-4 pb-3 border-b border-gray-200">
+                <div class="w-12 h-12 rounded-lg flex items-center justify-center text-2xl" style="background: var(--primary-color); color: white;">
+                    <i class="{{ category.icon }}"></i>
+                </div>
+                <div>
+                    <h3 class="text-xl font-bold">{{ category.name }}</h3>
+                    <p class="text-sm text-gray-500">{{ category.description }}</p>
+                </div>
+            </div>
+            <div class="space-y-2">
+                {% for game in category.games %}
+                <a href="{{ game.path }}"
+                   class="block p-3 rounded-lg hover:bg-gray-50 transition-colors border border-gray-200 hover:border-blue-300"
+                   target="_blank" rel="noopener noreferrer">
+                    <div class="flex items-center justify-between gap-2">
+                        <div class="flex items-center gap-2 flex-1 min-w-0">
+                            <i class="fa-solid fa-play-circle text-blue-600"></i>
+                            <span class="font-medium truncate">{{ game.name }}</span>
+                        </div>
+                        {% if category.uses_emulator %}
+                        <span class="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded whitespace-nowrap">Emulator</span>
+                        {% endif %}
+                    </div>
+                </a>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Instructions Section -->
+    <div class="mt-8 card p-6">
+        <h3 class="text-lg font-bold mb-3 flex items-center gap-2">
+            <i class="fa-solid fa-circle-question text-blue-600"></i>
+            Getting Started
+        </h3>
+        <div class="space-y-3 text-sm text-gray-700">
+            <div>
+                <h4 class="font-semibold mb-1">Built-in Games:</h4>
+                <p class="ml-4">
+                    Play Chess against the computer at 5 different difficulty levels, or enjoy 2-player local matches.
+                    Features full move history, undo, and game status tracking.
+                </p>
+            </div>
+            <div>
+                <h4 class="font-semibold mb-1">Adding Arcade Games:</h4>
+                <p class="ml-4">
+                    Place HTML5 game folders in <code class="bg-gray-100 px-2 py-1 rounded">games/arcade/</code>.
+                    For games with multiple files, create a folder with an <code class="bg-gray-100 px-1 py-0.5 rounded">index.html</code> entry point.
+                </p>
+            </div>
+            <div>
+                <h4 class="font-semibold mb-1">HTML5 Game Resources:</h4>
+                <p class="ml-4">
+                    Find free and open-source HTML5 games at:
+                    <a href="https://itch.io/games/free/tag-open-source" target="_blank" class="text-blue-600 hover:underline">itch.io</a>,
+                    <a href="https://libregamewiki.org/Main_Page" target="_blank" class="text-blue-600 hover:underline">LibreGameWiki</a>,
+                    <a href="https://freegamedev.net/" target="_blank" class="text-blue-600 hover:underline">Free Game Dev</a>
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

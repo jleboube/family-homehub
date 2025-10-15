@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="flex items-center justify-center min-h-[80vh]">
+    <div class="card p-8 max-w-md w-full">
+        <div class="text-center mb-6">
+            <i class="fa-solid fa-house-user text-6xl text-blue-600 mb-4"></i>
+            <h1 class="text-2xl font-bold mb-2">Welcome to {{ config.instance_name }}</h1>
+            <p class="text-gray-600">Sign in to continue</p>
+        </div>
+
+        <form method="POST" class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium mb-1">Username</label>
+                <select name="username" class="w-full border rounded p-2" required autofocus>
+                    <option value="">Select your name...</option>
+                    <option value="{{ config.admin_name }}">{{ config.admin_name }}</option>
+                    {% for member in config.family_members %}
+                    <option value="{{ member }}">{{ member }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium mb-1">Password</label>
+                <input type="password" name="password" class="w-full border rounded p-2"
+                       placeholder="Enter your password (leave blank for first-time setup)">
+            </div>
+
+            <button type="submit" class="w-full btn btn-primary py-3 text-base">
+                Sign In
+            </button>
+        </form>
+
+        <div class="mt-6 text-center text-sm text-gray-500">
+            <p>
+                <i class="fa-solid fa-info-circle"></i>
+                First time? You'll be prompted to set your password.
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %}

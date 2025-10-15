@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto space-y-6">
+    <div class="card p-6">
+        <div class="flex items-center justify-between mb-4">
+            <h1 class="text-2xl font-bold">
+                <i class="fa-solid fa-users text-blue-600 mr-2"></i>
+                Manage Family
+            </h1>
+            <a href="/" class="text-sm text-gray-600 hover:text-gray-800">
+                <i class="fa-solid fa-arrow-left mr-1"></i> Back to Home
+            </a>
+        </div>
+
+        <!-- Family Members Section -->
+        <div class="mb-8">
+            <h2 class="text-lg font-semibold mb-4">
+                <i class="fa-solid fa-user-group mr-2"></i>
+                Family Members
+            </h2>
+
+            <div class="space-y-3">
+                {% for user in users %}
+                <div class="bg-gray-50 border rounded p-4 flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                            <i class="fa-solid fa-user text-blue-600"></i>
+                        </div>
+                        <div>
+                            <div class="font-semibold">
+                                {{ user.username }}
+                                {% if user.is_admin %}
+                                <i class="fa-solid fa-crown text-amber-500 ml-2" title="Administrator"></i>
+                                {% endif %}
+                            </div>
+                            <div class="text-xs text-gray-600">
+                                {% if user.password_set %}
+                                <i class="fa-solid fa-check-circle text-green-600"></i> Password set
+                                {% else %}
+                                <i class="fa-solid fa-exclamation-circle text-amber-600"></i> Needs password setup
+                                {% endif %}
+                            </div>
+                            <div class="text-xs mt-1">
+                                {% if user.is_admin %}
+                                <span class="text-green-600">
+                                    <i class="fa-solid fa-calendar-check"></i> Calendar: Full Access
+                                </span>
+                                {% elif user.calendar_write_enabled %}
+                                <span class="text-blue-600">
+                                    <i class="fa-solid fa-calendar-check"></i> Calendar: Can Edit
+                                </span>
+                                {% else %}
+                                <span class="text-gray-500">
+                                    <i class="fa-solid fa-calendar"></i> Calendar: Read-Only
+                                </span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex gap-2 items-center">
+                        {% if not user.is_admin %}
+                        <!-- Calendar Write Permission Toggle -->
+                        <form method="POST" action="{{ url_for('main.toggle_calendar_permission', user_id=user.id) }}" class="inline">
+                            <label class="inline-flex items-center cursor-pointer">
+                                <input type="checkbox" name="calendar_write_enabled" value="1"
+                                       {% if user.calendar_write_enabled %}checked{% endif %}
+                                       onchange="this.form.submit()"
+                                       class="sr-only peer">
+                                <div class="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                                <span class="ms-2 text-xs font-medium text-gray-700">
+                                    <i class="fa-solid fa-calendar-edit"></i>
+                                </span>
+                            </label>
+                        </form>
+                        {% endif %}
+                        <form method="POST" action="{{ url_for('main.reset_user_password', user_id=user.id) }}" class="inline">
+                            <button type="submit" class="btn btn-primary text-xs">
+                                <i class="fa-solid fa-key mr-1"></i> Reset Password
+                            </button>
+                        </form>
+                        {% if not user.is_admin %}
+                        <form method="POST" action="{{ url_for('main.remove_family_member', user_id=user.id) }}"
+                              onsubmit="return confirm('Are you sure you want to remove {{ user.username }}?')" class="inline">
+                            <button type="submit" class="btn btn-danger text-xs">
+                                <i class="fa-solid fa-trash mr-1"></i> Remove
+                            </button>
+                        </form>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Add Family Member Section -->
+        <div class="border-t pt-6">
+            <h2 class="text-lg font-semibold mb-4">
+                <i class="fa-solid fa-user-plus mr-2"></i>
+                Add Family Member
+            </h2>
+            <form method="POST" action="{{ url_for('main.add_family_member') }}" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium mb-1">Username</label>
+                    <input type="text" name="username" required
+                           class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                           placeholder="Enter username">
+                </div>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fa-solid fa-plus mr-1"></i> Add Family Member
+                </button>
+            </form>
+        </div>
+
+        <!-- Config Sync Notice -->
+        <div class="mt-6 bg-amber-50 border border-amber-200 rounded p-4">
+            <p class="text-sm text-amber-900">
+                <i class="fa-solid fa-info-circle mr-1"></i>
+                <strong>Note:</strong> Changes made here are stored in the database only. To persist family members across container rebuilds, you should also update the <code class="bg-amber-100 px-1 rounded">family_members</code> list in your <code class="bg-amber-100 px-1 rounded">config.yml</code> file.
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %}

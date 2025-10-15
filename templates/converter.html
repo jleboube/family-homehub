@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="mx-auto">
+    <div class="flex items-center justify-between mb-6">
+        <h2 class="text-3xl font-bold"><i class="fa-solid fa-file-arrow-up text-blue-600 mr-2"></i>File Converter</h2>
+    </div>
+
+    <div class="mb-4 card p-4 bg-blue-50 border-l-4 border-blue-500">
+        <div class="flex items-start gap-3">
+            <i class="fa-solid fa-circle-info text-blue-600 text-xl mt-1"></i>
+            <div>
+                <h3 class="font-semibold text-blue-900 mb-1">About File Converter</h3>
+                <p class="text-sm text-blue-800 mb-2">
+                    This tool converts files directly in your browser using VERT (a privacy-focused, open-source file converter).
+                    All conversions happen locally - your files never leave your device.
+                </p>
+                <p class="text-sm text-blue-800">
+                    <strong>Supported formats:</strong> Images (PNG, JPG, WEBP, SVG, etc.), Audio (MP3, WAV, OGG, FLAC, etc.),
+                    Documents (PDF, DOCX, TXT, etc.), and Video (MP4, AVI, MKV, etc.).
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- VERT Embedded Converter -->
+    <div class="card p-0 overflow-hidden" style="height: calc(100vh - 250px); min-height: 600px;">
+        <iframe
+            src="http://localhost:3000"
+            class="w-full h-full border-0"
+            title="File Converter"
+            sandbox="allow-scripts allow-same-origin allow-forms allow-downloads"
+            loading="lazy">
+        </iframe>
+    </div>
+
+    <!-- Instructions Section -->
+    <div class="mt-4 card p-4 bg-gray-50">
+        <h3 class="text-sm font-semibold mb-2 flex items-center gap-2">
+            <i class="fa-solid fa-lightbulb text-yellow-600"></i>
+            Quick Tips
+        </h3>
+        <ul class="text-xs text-gray-700 space-y-1 ml-6 list-disc">
+            <li>Drag and drop files directly into the converter area</li>
+            <li>Select your desired output format from the dropdown</li>
+            <li>Click "Convert" and download your converted file</li>
+            <li>All processing happens in your browser - files stay private</li>
+            <li>Large video conversions may take several minutes</li>
+        </ul>
+    </div>
+</div>
+{% endblock %}

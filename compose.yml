@@ -1,0 +1,53 @@
+services:
+  homehub:
+    container_name: homehub
+    #image: ghcr.io/surajverma/homehub:latest
+    build: .
+    ports:
+      - "8765:5000"
+    volumes:
+      - ./uploads:/app/uploads
+      - ./media:/app/media
+      - ./pdfs:/app/pdfs
+      - ./data:/app/data
+      - ./config.yml:/app/config.yml:ro
+      - ./radicale-data:/app/radicale-data
+      - ./radicale-config:/app/radicale-config
+    environment:
+      - FLASK_ENV=production
+      - SECRET_KEY=${SECRET_KEY:-change_this_secret_key_in_production}
+      - VAULTWARDEN_URL=${VAULTWARDEN_URL:-http://homehub-vaultwarden:80}
+      - RADICALE_SYNC_INTERVAL=${RADICALE_SYNC_INTERVAL:-300}
+
+  vaultwarden:
+    container_name: homehub-vaultwarden
+    image: vaultwarden/server:latest
+    ports:
+      - "8080:80"
+    volumes:
+      - ./vaultwarden-data:/data
+    environment:
+      - SIGNUPS_ALLOWED=${VAULTWARDEN_SIGNUPS_ALLOWED:-true}
+      - INVITATIONS_ALLOWED=${VAULTWARDEN_INVITATIONS_ALLOWED:-true}
+      - WEBSOCKET_ENABLED=true
+      - DOMAIN=${VAULTWARDEN_DOMAIN:-http://localhost:8080}
+    restart: unless-stopped
+
+  radicale:
+    container_name: homehub-radicale
+    image: tomsquest/docker-radicale:latest
+    ports:
+      - "5232:5232"
+    volumes:
+      - ./radicale-data:/data
+      - ./radicale-config:/config:ro
+    environment:
+      - TAKE_FILE_OWNERSHIP=false
+    restart: unless-stopped
+
+  vert:
+    container_name: homehub-vert
+    image: ghcr.io/vert-sh/vert:latest
+    ports:
+      - "3000:80"
+    restart: unless-stopped

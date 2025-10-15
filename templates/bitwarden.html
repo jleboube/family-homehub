@@ -1,0 +1,189 @@
+{% extends "base.html" %}
+
+{% block extra_head %}
+<style>
+    .setup-card {
+        background: var(--card-background-color);
+        border-radius: 8px;
+        padding: 2rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    .bitwarden-iframe {
+        width: 100%;
+        height: calc(100vh - 200px);
+        border: 2px solid var(--secondary-color);
+        border-radius: 8px;
+        background: white;
+    }
+    .info-box {
+        background: rgba(29, 78, 216, 0.1);
+        border-left: 4px solid var(--primary-color);
+        padding: 1rem;
+        margin: 1rem 0;
+        border-radius: 4px;
+    }
+    .step-number {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 28px;
+        height: 28px;
+        background: var(--primary-color);
+        color: white;
+        border-radius: 50%;
+        font-weight: bold;
+        font-size: 14px;
+        margin-right: 8px;
+    }
+    .vault-info {
+        background: var(--card-background-color);
+        border: 1px solid var(--secondary-color);
+        border-radius: 8px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="flex items-center justify-between">
+        <h1 class="text-3xl font-bold" style="color: var(--text-color);">
+            <i class="fa-solid fa-shield-halved"></i> Password Manager
+        </h1>
+    </div>
+
+    <div id="bitwardenContent">
+        <!-- Content will be loaded by JavaScript based on user context -->
+    </div>
+</div>
+
+<script>
+// Initialize page based on server-provided user context
+document.addEventListener('DOMContentLoaded', function() {
+    const currentUser = '{{ current_user }}';
+    const hasVault = {{ 'true' if vault else 'false' }};
+    const vaultwardenUrl = '{{ vaultwarden_url }}';
+    const contentDiv = document.getElementById('bitwardenContent');
+
+    if (!currentUser) {
+        contentDiv.innerHTML = `
+            <div class="setup-card">
+                <div class="text-center">
+                    <i class="fa-solid fa-user-circle text-6xl mb-4" style="color: var(--secondary-color);"></i>
+                    <h2 class="text-2xl font-bold mb-4">Authentication Required</h2>
+                    <p class="text-gray-600 mb-4">Please log in to access your Bitwarden vault.</p>
+                </div>
+            </div>
+        `;
+        return;
+    }
+
+    // Check if user has vault setup
+    if (hasVault) {
+        showVaultIframe(currentUser, vaultwardenUrl);
+    } else {
+        showSetupInstructions(currentUser, vaultwardenUrl);
+    }
+});
+
+function showSetupInstructions(username, vaultwardenUrl) {
+    const contentDiv = document.getElementById('bitwardenContent');
+    const suggestedEmail = `${username.toLowerCase().replace(/\s+/g, '')}@homehub.local`;
+
+    contentDiv.innerHTML = `
+        <div class="setup-card">
+            <h2 class="text-2xl font-bold mb-4">
+                <i class="fa-solid fa-rocket"></i> Set Up Your Bitwarden Vault
+            </h2>
+
+            <div class="info-box">
+                <p class="font-semibold mb-2">
+                    <i class="fa-solid fa-info-circle"></i> Welcome to Bitwarden, ${username}!
+                </p>
+                <p>Bitwarden is a secure password manager that will help you create, store, and manage all your passwords safely.</p>
+            </div>
+
+            <div class="space-y-4 my-6">
+                <div>
+                    <span class="step-number">1</span>
+                    <span class="font-semibold">Open Vaultwarden in a new tab:</span>
+                    <div class="ml-9 mt-2">
+                        <a href="${vaultwardenUrl}" target="_blank" class="btn btn-primary">
+                            <i class="fa-solid fa-external-link-alt"></i> Open Vaultwarden
+                        </a>
+                    </div>
+                </div>
+
+                <div>
+                    <span class="step-number">2</span>
+                    <span class="font-semibold">Create your account:</span>
+                    <ul class="ml-9 mt-2 space-y-2 text-gray-700">
+                        <li><i class="fa-solid fa-check text-green-600"></i> Click "Create Account"</li>
+                        <li><i class="fa-solid fa-check text-green-600"></i> Use this email: <code class="bg-gray-100 px-2 py-1 rounded">${suggestedEmail}</code></li>
+                        <li><i class="fa-solid fa-check text-green-600"></i> Create a <strong>strong master password</strong> (you'll need this to access your vault)</li>
+                        <li><i class="fa-solid fa-exclamation-triangle text-amber-600"></i> <strong>Important:</strong> Remember your master password! It cannot be recovered.</li>
+                    </ul>
+                </div>
+
+                <div>
+                    <span class="step-number">3</span>
+                    <span class="font-semibold">Confirm your setup:</span>
+                    <div class="ml-9 mt-2">
+                        <form method="POST" action="/bitwarden" class="space-y-3">
+                            <input type="hidden" name="username" value="${username}">
+                            <div>
+                                <label class="block text-sm font-medium mb-1">Bitwarden Email:</label>
+                                <input type="email" name="email" value="${suggestedEmail}"
+                                       class="w-full border rounded p-2" required>
+                            </div>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fa-solid fa-check-circle"></i> I've Created My Account
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <div class="info-box mt-6">
+                <p class="text-sm">
+                    <i class="fa-solid fa-lock"></i> <strong>Privacy & Security:</strong> Your Bitwarden vault is completely private and encrypted.
+                    Even the HomeHub administrator cannot access your passwords. Only you can unlock your vault with your master password.
+                </p>
+            </div>
+        </div>
+    `;
+}
+
+function showVaultIframe(username, vaultwardenUrl) {
+    const contentDiv = document.getElementById('bitwardenContent');
+    const suggestedEmail = `${username.toLowerCase().replace(/\s+/g, '')}@homehub.local`;
+
+    contentDiv.innerHTML = `
+        <div class="vault-info" data-vault-setup="true">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h3 class="font-semibold text-lg">
+                        <i class="fa-solid fa-user"></i> ${username}'s Vault
+                    </h3>
+                    <p class="text-sm text-gray-600">Email: ${suggestedEmail}</p>
+                </div>
+                <a href="${vaultwardenUrl}" target="_blank" class="btn btn-primary">
+                    <i class="fa-solid fa-external-link-alt"></i> Open in New Tab
+                </a>
+            </div>
+        </div>
+
+        <div class="info-box">
+            <p class="text-sm">
+                <i class="fa-solid fa-info-circle"></i> Your Bitwarden vault is displayed below. You can also
+                <a href="${vaultwardenUrl}" target="_blank" class="text-blue-600 hover:underline">open it in a new tab</a>
+                for a better experience.
+            </p>
+        </div>
+
+        <iframe src="${vaultwardenUrl}" class="bitwarden-iframe" title="Bitwarden Vault"></iframe>
+    `;
+}
+</script>
+{% endblock %}

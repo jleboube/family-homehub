@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="mx-auto">
+    <h2 class="text-xl font-bold mb-4">QR Code Generator</h2>
+    <div class="mb-4 p-4 card bg-gray-50 border border-gray-200">
+        <h3 class="font-semibold mb-2">WiFi QR Code Instructions</h3>
+        <p>To generate a QR code for your wireless network, enter your details in the following format:</p>
+        <pre class="bg-gray-100 p-2 rounded text-sm overflow-x-auto"><code>ssid:mywifiname pass:123456789 type:wpa hidden:false</code></pre>
+        <ul class="list-disc ml-6 text-sm">
+            <li><b>ssid</b>: your WiFi network name</li>
+            <li><b>pass</b>: your WiFi password</li>
+            <li><b>type</b>: encryption type (<code>wpa</code>, <code>wep</code>, or <code>nopass</code>), default is <code>wpa</code></li>
+            <li><b>hidden</b>: <code>true</code> if the network is hidden, <code>false</code> otherwise (default is <code>false</code>)</li>
+        </ul>
+        <p class="mt-2 text-xs text-gray-600">You can copy and edit the code block above for your network. The minimum required information is ssid:your_network_name pass:your_wifi_password</p>
+        <p class="mt-2 text-xs text-gray-600">For other QR codes, enter any text or URL as usual.</p>
+    </div>
+    <form method="POST" class="mb-4 grid grid-cols-1 md:grid-cols-12 gap-2 items-end">
+        <input type="text" name="qrtext" class="md:col-span-9 w-full p-2 border rounded" placeholder="Text to encode..." required>
+        <input type="hidden" name="creator" id="creator">
+        <button type="submit" class="md:col-span-3 btn btn-primary">Generate QR</button>
+    </form>
+    {% if qr_img %}
+    <div class="mt-4 card p-4">
+        <img src="data:image/png;base64,{{ qr_img }}" alt="QR Code" class="mx-auto">
+    </div>
+    {% endif %}
+    <h3 class="text-lg font-bold mt-6 mb-2">History</h3>
+    <ul>
+        {% for q in history %}
+        <li class="card p-4 mb-2 flex flex-wrap gap-2 items-center">
+            <span class="flex-1 truncate">{{ q.text }}</span>
+            <a class="btn" href="/static/{{ q.filename }}" target="_blank">View</a>
+            <a class="btn" href="/static/{{ q.filename }}" download target="_blank" rel="noopener noreferrer">Download</a>
+            <span class="text-xs text-gray-500">By {{ q.creator }} at {{ q.timestamp.strftime('%Y-%m-%d %H:%M') }}</span>
+            <form method="POST" action="/qr/delete/{{ q.id }}" class="delete-form" data-creator="{{ q.creator }}">
+                <input type="hidden" name="user">
+                <button type="submit" class="btn btn-danger">Delete</button>
+            </form>
+        </li>
+        {% endfor %}
+    </ul>
+</div>
+<script>
+document.getElementById('creator').value = localStorage.getItem('username');
+document.querySelectorAll('input[name="user"]').forEach(i=> i.value = localStorage.getItem('username'));
+// Hide delete for non-owners
+(function(){
+    const adminName='{{ config.admin_name }}';
+    const current=localStorage.getItem('username');
+    document.querySelectorAll('.delete-form').forEach(f=>{
+        const c=f.getAttribute('data-creator');
+        if(!(current===c||current===adminName||current==='Administrator'||current==='admin')) f.style.display='none';
+    });
+})();
+</script>
+{% endblock %}

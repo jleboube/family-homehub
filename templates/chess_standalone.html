@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chess - Remote Game</title>
+    <link href="/static/output.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary-color: {{ config.theme.primary_color }};
+        }
+        body {
+            background-color: #f3f4f6;
+            font-family: system-ui, -apple-system, sans-serif;
+        }
+        .card {
+            background: white;
+            border-radius: 0.5rem;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+        }
+        .btn {
+            padding: 0.5rem 1rem;
+            border-radius: 0.375rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 1px solid #d1d5db;
+            background: white;
+        }
+        .btn:hover {
+            background: #f9fafb;
+        }
+        .btn-primary {
+            background: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+        }
+        .btn-primary:hover {
+            opacity: 0.9;
+        }
+    </style>
+</head>
+<body class="p-4">
+<div class="mx-auto max-w-6xl">
+    <div class="mb-6 text-center">
+        <h2 class="text-3xl font-bold text-gray-800">
+            <i class="fa-solid fa-chess mr-2 text-purple-600"></i>Remote Chess Game
+        </h2>
+        <p class="text-sm text-gray-500 mt-2">Shared game - no login required</p>
+    </div>
+
+    {% include '_chess_game.html' %}
+</div>
+</body>
+</html>

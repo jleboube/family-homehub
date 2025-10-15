@@ -1,0 +1,50 @@
+# Database files
+data/
+database.db
+
+# ROMM database files
+romm-db/
+
+# User-uploaded files
+uploads/
+media/
+pdfs/
+games/*/
+!games/README.md
+
+# Docker volumes with sensitive data
+radicale-data/
+radicale-config/
+vaultwarden-data/
+
+# Python cache files
+*.pyc
+__pycache__/
+
+# Environment variables
+.env
+.env.local
+.env.production
+config.yml
+
+# Secret keys
+*.key
+*.pem
+*.crt
+secrets/
+
+# Node.js dependencies and build artifacts
+node_modules/
+package-lock.json
+static/output.css
+static/custom.css
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo

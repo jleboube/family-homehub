@@ -1,0 +1,173 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="mx-auto max-w-6xl">
+    <div class="flex items-center justify-between mb-6">
+        <h2 class="text-3xl font-bold"><i class="fa-solid fa-clock text-indigo-600 mr-2"></i>Countdown Timers</h2>
+        <button onclick="showAddCountdown()" class="btn btn-primary">
+            <i class="fa-solid fa-plus mr-2"></i>Add Countdown
+        </button>
+    </div>
+
+    <!-- Active Countdowns -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {% for countdown in countdowns %}
+        <div class="card p-6 text-center {% if countdown.is_past %}bg-gray-100{% else %}bg-gradient-to-br from-purple-50 to-pink-50{% endif %}" data-id="{{ countdown.id }}" data-date="{{ countdown.event_date.isoformat() }}">
+            <div class="flex justify-between items-start mb-4">
+                <div class="flex-1">
+                    <div class="w-12 h-12 rounded-full mx-auto mb-3 flex items-center justify-center text-2xl" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                        <i class="fa-solid fa-{{ countdown.icon or 'calendar-day' }}"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-1">{{ countdown.event_name }}</h3>
+                    <p class="text-sm text-gray-600">{{ countdown.event_date.strftime('%B %d, %Y') }}</p>
+                </div>
+                <button onclick="deleteCountdown({{ countdown.id }})" class="text-red-600 hover:text-red-800">
+                    <i class="fa-solid fa-trash"></i>
+                </button>
+            </div>
+
+            {% if not countdown.is_past %}
+            <div class="countdown-timer bg-white rounded-lg p-4 shadow-sm" data-target="{{ countdown.event_date.isoformat() }}">
+                <div class="grid grid-cols-4 gap-2 text-center">
+                    <div>
+                        <div class="text-2xl font-bold text-purple-600 countdown-days">0</div>
+                        <div class="text-xs text-gray-500">Days</div>
+                    </div>
+                    <div>
+                        <div class="text-2xl font-bold text-purple-600 countdown-hours">0</div>
+                        <div class="text-xs text-gray-500">Hours</div>
+                    </div>
+                    <div>
+                        <div class="text-2xl font-bold text-purple-600 countdown-minutes">0</div>
+                        <div class="text-xs text-gray-500">Mins</div>
+                    </div>
+                    <div>
+                        <div class="text-2xl font-bold text-purple-600 countdown-seconds">0</div>
+                        <div class="text-xs text-gray-500">Secs</div>
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <div class="bg-gray-200 rounded-lg p-4">
+                <p class="text-gray-600 font-semibold">
+                    <i class="fa-solid fa-check-circle mr-2"></i>Event Passed
+                </p>
+            </div>
+            {% endif %}
+
+            {% if countdown.description %}
+            <p class="text-sm text-gray-600 mt-3">{{ countdown.description }}</p>
+            {% endif %}
+        </div>
+        {% else %}
+        <div class="col-span-full text-center py-12 text-gray-500">
+            <i class="fa-solid fa-hourglass-empty text-6xl mb-4"></i>
+            <p>No countdowns yet. Add important dates to track!</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Add Countdown Modal -->
+<div id="countdownModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-lg p-6 max-w-md w-full">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-xl font-bold">Add Countdown</h3>
+            <button onclick="document.getElementById('countdownModal').classList.add('hidden')" class="text-gray-500 hover:text-gray-700">
+                <i class="fa-solid fa-times text-2xl"></i>
+            </button>
+        </div>
+        <form method="POST" action="/countdowns/add">
+            <div class="mb-4">
+                <label class="block font-semibold mb-2">Event Name</label>
+                <input type="text" name="event_name" required class="w-full p-2 border rounded" placeholder="e.g., Summer Vacation">
+            </div>
+            <div class="mb-4">
+                <label class="block font-semibold mb-2">Event Date</label>
+                <input type="date" name="event_date" required class="w-full p-2 border rounded">
+            </div>
+            <div class="mb-4">
+                <label class="block font-semibold mb-2">Icon</label>
+                <select name="icon" class="w-full p-2 border rounded">
+                    <option value="calendar-day">Calendar</option>
+                    <option value="birthday-cake">Birthday</option>
+                    <option value="plane">Vacation</option>
+                    <option value="graduation-cap">Graduation</option>
+                    <option value="heart">Anniversary</option>
+                    <option value="gift">Gift/Present</option>
+                    <option value="tree">Holiday</option>
+                    <option value="trophy">Achievement</option>
+                    <option value="baby">Baby</option>
+                    <option value="home">Moving</option>
+                </select>
+            </div>
+            <div class="mb-4">
+                <label class="block font-semibold mb-2">Description (Optional)</label>
+                <textarea name="description" class="w-full p-2 border rounded" rows="2" placeholder="Additional details..."></textarea>
+            </div>
+            <input type="hidden" name="creator" id="countdownCreator">
+            <div class="flex gap-2">
+                <button type="submit" class="btn btn-primary flex-1">Add Countdown</button>
+                <button type="button" onclick="document.getElementById('countdownModal').classList.add('hidden')" class="btn flex-1">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+document.getElementById('countdownCreator').value = localStorage.getItem('username');
+
+function showAddCountdown() {
+    // Set default date to tomorrow
+    const input = document.querySelector('input[name="event_date"]');
+    const date = new Date();
+    date.setDate(date.getDate() + 1);
+    input.value = date.toISOString().split('T')[0];
+    input.min = new Date().toISOString().split('T')[0];
+    document.getElementById('countdownModal').classList.remove('hidden');
+}
+
+function deleteCountdown(id) {
+    if (!confirm('Delete this countdown?')) return;
+
+    const formData = new FormData();
+    formData.append('user', localStorage.getItem('username'));
+
+    fetch(`/countdowns/delete/${id}`, { method: 'POST', body: formData })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            }
+        });
+}
+
+// Countdown timer logic
+function updateCountdowns() {
+    document.querySelectorAll('.countdown-timer').forEach(timer => {
+        const targetDate = new Date(timer.dataset.target);
+        const now = new Date();
+        const diff = targetDate - now;
+
+        if (diff <= 0) {
+            // Event has passed, reload to update UI
+            location.reload();
+            return;
+        }
+
+        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+        const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+        const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+        timer.querySelector('.countdown-days').textContent = days;
+        timer.querySelector('.countdown-hours').textContent = hours.toString().padStart(2, '0');
+        timer.querySelector('.countdown-minutes').textContent = minutes.toString().padStart(2, '0');
+        timer.querySelector('.countdown-seconds').textContent = seconds.toString().padStart(2, '0');
+    });
+}
+
+// Update every second
+setInterval(updateCountdowns, 1000);
+updateCountdowns();
+</script>
+{% endblock %}

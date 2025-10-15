@@ -1,0 +1,237 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="mx-auto max-w-7xl">
+    <div class="flex items-center justify-between mb-6">
+        <h2 class="text-3xl font-bold"><i class="fa-solid fa-utensils text-orange-600 mr-2"></i>Meal Planner</h2>
+    </div>
+
+    <!-- Random Meal Decision Maker -->
+    <div class="card p-6 mb-6 bg-gradient-to-r from-purple-50 to-pink-50">
+        <h3 class="text-xl font-bold mb-4 flex items-center gap-2">
+            <i class="fa-solid fa-dice text-purple-600"></i>
+            Can't Decide What to Eat?
+        </h3>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+                <label class="block font-semibold mb-2">Add Options</label>
+                <div class="flex gap-2 mb-2">
+                    <input type="text" id="mealOption" class="flex-1 p-2 border rounded-lg" placeholder="Enter meal idea..." onkeypress="if(event.key==='Enter') addMealOption()">
+                    <button onclick="addMealOption()" class="btn btn-primary"><i class="fa-solid fa-plus"></i></button>
+                </div>
+                <div id="mealOptions" class="space-y-1"></div>
+            </div>
+            <div class="flex items-center justify-center">
+                <button onclick="spinWheel()" class="btn btn-primary text-lg px-8 py-4">
+                    <i class="fa-solid fa-dice text-2xl mr-2"></i>
+                    Spin the Wheel!
+                </button>
+            </div>
+            <div class="flex items-center justify-center">
+                <div id="wheelResult" class="text-center hidden">
+                    <p class="text-sm text-gray-600 mb-2">You should eat:</p>
+                    <p class="text-3xl font-bold text-purple-600" id="selectedMeal"></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Weekly Meal Plan -->
+    <div class="card p-6 mb-6">
+        <h3 class="text-xl font-bold mb-4">This Week's Meal Plan</h3>
+        <div class="grid grid-cols-1 md:grid-cols-7 gap-3">
+            {% set days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] %}
+            {% for day in days %}
+            <div class="card p-4 bg-gray-50 hover:bg-blue-50 transition-all">
+                <h4 class="font-bold text-sm mb-3 text-center pb-2 border-b">{{ day }}</h4>
+                <div class="space-y-2">
+                    {% for meal_type in ['Breakfast', 'Lunch', 'Dinner'] %}
+                    <div class="bg-white p-2 rounded border">
+                        <p class="text-xs font-semibold text-gray-500">{{ meal_type }}</p>
+                        <textarea
+                            class="meal-input w-full text-sm border-0 focus:outline-none resize-none"
+                            rows="2"
+                            data-day="{{ day }}"
+                            data-meal="{{ meal_type }}"
+                            onchange="saveMeal(this)"
+                            placeholder="Enter meal...">{% for plan in meal_plans %}{% if plan.day == day and plan.meal_type == meal_type %}{{ plan.meal_name }}{% endif %}{% endfor %}</textarea>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Favorite Meals -->
+    <div class="card p-6">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-xl font-bold">Favorite Meals</h3>
+            <button onclick="showAddFavorite()" class="btn btn-primary">
+                <i class="fa-solid fa-plus mr-1"></i>Add Favorite
+            </button>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {% for fav in favorites %}
+            <div class="card p-4 bg-yellow-50 border-l-4 border-yellow-500">
+                <div class="flex justify-between items-start mb-2">
+                    <h4 class="font-bold">{{ fav.name }}</h4>
+                    <button onclick="deleteFavorite({{ fav.id }})" class="text-red-600 hover:text-red-800">
+                        <i class="fa-solid fa-trash"></i>
+                    </button>
+                </div>
+                {% if fav.ingredients %}
+                <p class="text-sm text-gray-600 mb-2">{{ fav.ingredients }}</p>
+                {% endif %}
+                <button onclick="addToWheel('{{ fav.name }}')" class="text-xs btn bg-purple-600 text-white">
+                    <i class="fa-solid fa-dice mr-1"></i>Add to Wheel
+                </button>
+            </div>
+            {% else %}
+            <div class="col-span-full text-center py-8 text-gray-500">
+                <i class="fa-solid fa-heart text-4xl mb-2"></i>
+                <p>No favorites yet. Add your family's favorite meals!</p>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<!-- Add Favorite Modal -->
+<div id="favoriteModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-lg p-6 max-w-md w-full">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-xl font-bold">Add Favorite Meal</h3>
+            <button onclick="document.getElementById('favoriteModal').classList.add('hidden')" class="text-gray-500 hover:text-gray-700">
+                <i class="fa-solid fa-times text-2xl"></i>
+            </button>
+        </div>
+        <form method="POST" action="/meals/favorite/add">
+            <div class="mb-4">
+                <label class="block font-semibold mb-2">Meal Name</label>
+                <input type="text" name="name" required class="w-full p-2 border rounded">
+            </div>
+            <div class="mb-4">
+                <label class="block font-semibold mb-2">Ingredients (Optional)</label>
+                <textarea name="ingredients" class="w-full p-2 border rounded" rows="3" placeholder="List main ingredients..."></textarea>
+            </div>
+            <input type="hidden" name="creator" id="favoriteCreator">
+            <div class="flex gap-2">
+                <button type="submit" class="btn btn-primary flex-1">Add</button>
+                <button type="button" onclick="document.getElementById('favoriteModal').classList.add('hidden')" class="btn flex-1">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+document.getElementById('favoriteCreator').value = localStorage.getItem('username');
+
+// Random Decision Maker
+let mealOptions = [];
+
+function addMealOption() {
+    const input = document.getElementById('mealOption');
+    const value = input.value.trim();
+    if (!value) return;
+
+    mealOptions.push(value);
+    updateMealOptions();
+    input.value = '';
+}
+
+function updateMealOptions() {
+    const container = document.getElementById('mealOptions');
+    container.innerHTML = '';
+    mealOptions.forEach((option, index) => {
+        const div = document.createElement('div');
+        div.className = 'flex items-center justify-between bg-white p-2 rounded border';
+        div.innerHTML = `
+            <span class="text-sm">${option}</span>
+            <button onclick="removeMealOption(${index})" class="text-red-600 hover:text-red-800 text-xs">
+                <i class="fa-solid fa-times"></i>
+            </button>
+        `;
+        container.appendChild(div);
+    });
+}
+
+function removeMealOption(index) {
+    mealOptions.splice(index, 1);
+    updateMealOptions();
+}
+
+function addToWheel(mealName) {
+    if (!mealOptions.includes(mealName)) {
+        mealOptions.push(mealName);
+        updateMealOptions();
+        if (window.globalToast) globalToast(`Added "${mealName}" to wheel!`, 'success');
+    }
+}
+
+function spinWheel() {
+    if (mealOptions.length === 0) {
+        if (window.globalToast) globalToast('Add some meal options first!', 'error');
+        return;
+    }
+
+    const result = document.getElementById('wheelResult');
+    const selectedMeal = document.getElementById('selectedMeal');
+
+    // Animate the spin
+    let spins = 0;
+    const maxSpins = 20;
+    const interval = setInterval(() => {
+        const randomIndex = Math.floor(Math.random() * mealOptions.length);
+        selectedMeal.textContent = mealOptions[randomIndex];
+        spins++;
+
+        if (spins >= maxSpins) {
+            clearInterval(interval);
+            result.classList.remove('hidden');
+        }
+    }, 100);
+}
+
+// Meal Plan Saving
+function saveMeal(textarea) {
+    const day = textarea.dataset.day;
+    const mealType = textarea.dataset.meal;
+    const mealName = textarea.value;
+
+    fetch('/meals/plan/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ day, meal_type: mealType, meal_name: mealName })
+    }).then(r => r.json()).then(data => {
+        if (data.success && window.globalToast) {
+            globalToast('Meal saved!', 'success');
+        }
+    });
+}
+
+function showAddFavorite() {
+    document.getElementById('favoriteModal').classList.remove('hidden');
+}
+
+function deleteFavorite(id) {
+    if (!confirm('Remove this favorite meal?')) return;
+
+    const formData = new FormData();
+    formData.append('user', localStorage.getItem('username'));
+
+    fetch(`/meals/favorite/delete/${id}`, { method: 'POST', body: formData })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            }
+        });
+}
+
+// Load favorites into wheel on page load
+{% for fav in favorites %}
+mealOptions.push('{{ fav.name }}');
+{% endfor %}
+updateMealOptions();
+</script>
+{% endblock %}

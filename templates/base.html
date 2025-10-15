@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ config.instance_name }} - HomeHub</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='output.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <!-- Config-driven theme variables (takes priority) -->
+    {% set pc = config.theme.primary_color.lstrip('#') %}
+    <style id="config-theme-vars">
+    /* Apply configured colors only when not in dark mode so dark overrides can take effect */
+    :root:not([data-theme="dark"]), [data-theme="light"] {
+        --primary-color: {{ config.theme.primary_color }};
+        --secondary-color: {{ config.theme.secondary_color }};
+        --background-color: {{ config.theme.background_color }};
+        --card-background-color: {{ config.theme.card_background_color }};
+        --text-color: {{ config.theme.text_color }};
+        --sidebar-background-color: {{ config.theme.sidebar_background_color }};
+        --sidebar-text-color: {{ config.theme.sidebar_text_color }};
+        --sidebar-link-color: {{ config.theme.sidebar_link_color }};
+        --sidebar-link-border-color: {{ config.theme.sidebar_link_border_color }};
+        --sidebar-active-color: {{ config.theme.sidebar_active_color }};
+    }
+    </style>
+    {% if pc|length == 6 %}
+    <style>:root { --primary-rgb: {{ pc[0:2]|int(base=16) }}, {{ pc[2:4]|int(base=16) }}, {{ pc[4:6]|int(base=16) }}; }</style>
+    {% endif %}
+    <style>
+    /* Pill-shaped buttons with shadows */
+    .btn, button.btn, a.btn {
+        padding: 0.625rem 1.25rem;
+        font-size: 0.875rem;
+        font-weight: 600;
+        line-height: 1.25rem;
+        border-radius: 9999px;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.375rem;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        transition: all 0.2s ease;
+    }
+    .btn-primary {
+        background: var(--primary-color);
+        color: #fff;
+    }
+    .btn-primary:hover {
+        filter: brightness(1.1);
+        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+        transform: translateY(-1px);
+    }
+    .btn-danger {
+        background: #dc2626;
+        color: #fff;
+    }
+    .btn-danger:hover {
+        filter: brightness(1.1);
+        box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
+        transform: translateY(-1px);
+    }
+
+    /* Card styles with shadows and depth */
+    .card {
+        background: var(--card-background-color);
+        border-radius: 1rem;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+        transition: all 0.3s ease;
+    }
+    .card:hover {
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+        transform: translateY(-2px);
+    }
+
+    /* Sidebar link styling */
+    .sidebar-link {
+        border-radius: 0.75rem;
+        transition: all 0.2s ease;
+        font-weight: 500;
+    }
+    .sidebar-link:hover {
+        transform: translateX(4px);
+    }
+
+    /* Dark mode enhancements for money green theme */
+    [data-theme="dark"] {
+        --background-color: #022c22;
+        --card-background-color: #064e3b;
+        --text-color: #d1fae5;
+        --sidebar-background-color: #065f46;
+        --sidebar-active-color: #34d399;
+    }
+    [data-theme="dark"] .card {
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+    }
+    [data-theme="dark"] .card:hover {
+        box-shadow: 0 8px 24px rgba(16, 185, 129, 0.2);
+    }
+    </style>
+    {% block extra_head %}{% endblock %}
+    <script>
+        (function() {
+            const mq = window.matchMedia('(prefers-color-scheme: dark)');
+            const apply = () => document.documentElement.setAttribute('data-theme', mq.matches ? 'dark' : 'light');
+            apply();
+            try { mq.addEventListener('change', apply); } catch(e) { mq.addListener(apply); }
+        })();
+    </script>
+</head>
+<body class="min-h-screen">
+    <div class="flex min-h-screen">
+        <!-- Global JSON data for client scripts -->
+        <script id="familyData" type="application/json">{{ config.family_members | tojson }}</script>
+        <!-- Sidebar - Enhanced with larger width and icons -->
+        <aside id="sidebar" class="sidebar w-72 text-white flex flex-col fixed md:static inset-y-0 left-0 transform -translate-x-full md:translate-x-0 transition-transform duration-300 z-40 shadow-2xl">
+            <div class="p-6 text-2xl font-bold border-b border-white/20 flex items-center justify-between" style="color: var(--sidebar-text-color);">
+                <div class="flex items-center gap-3">
+                    <i class="fas fa-home text-3xl"></i>
+                    <span>{{ config.instance_name }}</span>
+                </div>
+                <button id="closeSidebar" class="md:hidden text-white/90 hover:text-white text-2xl" aria-label="Close">✕</button>
+            </div>
+            <nav class="flex-1 p-4 space-y-1 overflow-y-auto" id="sidebarNav">
+                <a href="/" class="block py-3 px-4 rounded sidebar-link flex items-center gap-3">
+                    <i class="fas fa-house text-lg w-6"></i>
+                    <span>Welcome</span>
+                </a>
+                {% if config.feature_toggles.get('notes') %}<a href="/notes" class="block py-3 px-4 rounded sidebar-link flex items-center gap-3">
+                    <i class="fas fa-sticky-note text-lg w-6"></i>
+                    <span>Shared Notes</span>
+                </a>{% endif %}
+                {% if config.feature_toggles.get('shared_cloud') %}<a href="/upload" class="block py-3 px-4 rounded sidebar-link flex items-center gap-3">
+                    <i class="fas fa-cloud-arrow-up text-lg w-6"></i>
+                    <span>Shared Cloud</span>
+                </a>{% endif %}
+                {% if config.feature_toggles.get('shopping_list') %}<a href="/shopping" class="block py-3 px-4 rounded sidebar-link flex items-center gap-3">
+                    <i class="fas fa-cart-shopping text-lg w-6"></i>
+                    <span>Shopping List</span>
+                </a>{% endif %}
+                {% if config.feature_toggles.get('chores') %}<a href="/chores" class="block py-3 px-4 rounded sidebar-link flex items-center gap-3">
+                    <i class="fas fa-list-check text-lg w-6"></i>
+                    <span>To-Do/Chores</span>
+                </a>{% endif %}
+                {% if config.feature_toggles.get('recipes') %}<a href="/recipes" class="block py-3 px-4 rounded sidebar-link flex items-center gap-3">
+                    <i class="fas fa-utensils text-lg w-6"></i>
+                    <span>Recipe Book</span>
+                </a>{% endif %}
+                {% if config.feature_toggles.get('expiry_tracker') %}<a href="/expiry" class="block py-3 px-4 rounded sidebar-link flex items-center gap-3">
+                    <i class="fas fa-calendar-xmark text-lg w-6"></i>
+                    <span>Expiry Tracker</span>
+                </a>{% endif %}
+                {% if config.feature_toggles.get('url_shortener') %}<a href="/shorten" class="block py-3 px-4 rounded sidebar-link flex items-center gap-3">
+                    <i class="fas fa-link text-lg w-6"></i>
+                    <span>URL Shortener</span>
+                </a>{% endif %}
+                {% if config.feature_toggles.get('media_downloader') %}<a href="/media" class="block py-3 px-4 rounded sidebar-link flex items-center gap-3">
+                    <i class="fas fa-download text-lg w-6"></i>
+                    <span>Media Downloader</span>
+                </a>{% endif %}
+                {% if config.feature_toggles.get('pdf_compressor') %}<a href="/pdfs" class="block py-3 px-4 rounded sidebar-link flex items-center gap-3">
+                    <i class="fas fa-file-pdf text-lg w-6"></i>
+                    <span>PDF Compressor</span>
+                </a>{% endif %}
+                {% if config.feature_toggles.get('qr_generator') %}<a href="/qr" class="block py-3 px-4 rounded sidebar-link flex items-center gap-3">
+                    <i class="fas fa-qrcode text-lg w-6"></i>
+                    <span>QR Generator</span>
+                </a>{% endif %}
+                {% if config.feature_toggles.get('expense_tracker', true) %}<a href="/expenses" class="block py-3 px-4 rounded sidebar-link flex items-center gap-3">
+                    <i class="fas fa-dollar-sign text-lg w-6"></i>
+                    <span>Expense Tracker</span>
+                </a>{% endif %}
+                {% if config.feature_toggles.get('bitwarden') %}<a href="/bitwarden" class="block py-3 px-4 rounded sidebar-link flex items-center gap-3">
+                    <i class="fas fa-lock text-lg w-6"></i>
+                    <span>Password Manager</span>
+                </a>{% endif %}
+                {% if config.feature_toggles.get('games') %}<a href="/games" class="block py-3 px-4 rounded sidebar-link flex items-center gap-3">
+                    <i class="fas fa-gamepad text-lg w-6"></i>
+                    <span>Games</span>
+                </a>{% endif %}
+                {% if config.feature_toggles.get('file_converter') %}<a href="/converter" class="block py-3 px-4 rounded sidebar-link flex items-center gap-3">
+                    <i class="fas fa-file-arrow-up text-lg w-6"></i>
+                    <span>File Converter</span>
+                </a>{% endif %}
+                {% if config.feature_toggles.get('dev_tools') %}<a href="/devtools" class="block py-3 px-4 rounded sidebar-link flex items-center gap-3">
+                    <i class="fas fa-code text-lg w-6"></i>
+                    <span>Development Tools</span>
+                </a>{% endif %}
+                {% if config.feature_toggles.get('photo_gallery') %}<a href="/photos" class="block py-3 px-4 rounded sidebar-link flex items-center gap-3">
+                    <i class="fas fa-images text-lg w-6"></i>
+                    <span>Photo Gallery</span>
+                </a>{% endif %}
+                {% if config.feature_toggles.get('meal_planner') %}<a href="/meals" class="block py-3 px-4 rounded sidebar-link flex items-center gap-3">
+                    <i class="fas fa-utensils text-lg w-6"></i>
+                    <span>Meal Planner</span>
+                </a>{% endif %}
+                {% if config.feature_toggles.get('maintenance_log') %}<a href="/maintenance" class="block py-3 px-4 rounded sidebar-link flex items-center gap-3">
+                    <i class="fas fa-wrench text-lg w-6"></i>
+                    <span>Maintenance Log</span>
+                </a>{% endif %}
+                {% if config.feature_toggles.get('pet_care') %}<a href="/petcare" class="block py-3 px-4 rounded sidebar-link flex items-center gap-3">
+                    <i class="fas fa-paw text-lg w-6"></i>
+                    <span>Pet Care</span>
+                </a>{% endif %}
+                {% if config.feature_toggles.get('weather') %}<a href="/weather" class="block py-3 px-4 rounded sidebar-link flex items-center gap-3">
+                    <i class="fas fa-cloud-sun text-lg w-6"></i>
+                    <span>Weather</span>
+                </a>{% endif %}
+                {% if config.feature_toggles.get('countdown_timers') %}<a href="/countdowns" class="block py-3 px-4 rounded sidebar-link flex items-center gap-3">
+                    <i class="fas fa-clock text-lg w-6"></i>
+                    <span>Countdown Timers</span>
+                </a>{% endif %}
+            </nav>
+            {% if is_authed and session.get('is_admin') %}
+            <div class="p-4 border-t border-white/20 space-y-1">
+                <a href="/admin/manage-family" class="block py-3 px-4 rounded sidebar-link flex items-center gap-3">
+                    <i class="fas fa-users text-lg w-6"></i>
+                    <span>Manage Family</span>
+                </a>
+                <a href="/caldav" class="block py-3 px-4 rounded sidebar-link flex items-center gap-3">
+                    <i class="fas fa-calendar-days text-lg w-6"></i>
+                    <span>Calendar</span>
+                </a>
+            </div>
+            {% endif %}
+            <script>
+            // Highlight active sidebar link
+            (() => {
+                const links = document.querySelectorAll('#sidebarNav .sidebar-link');
+                const path = window.location.pathname.replace(/\/$/, '');
+                links.forEach(link => {
+                    let href = link.getAttribute('href').replace(/\/$/, '');
+                    // Only mark active if exact match
+                    if (href === path) {
+                        link.classList.add('active');
+                    } else {
+                        link.classList.remove('active');
+                    }
+                });
+            })();
+            </script>
+        </aside>
+        <!-- Main Content -->
+        <main class="main-content flex-1 p-4 md:p-8 overflow-y-auto md:ml-0 ml-0">
+            <div class="max-w-none md:max-w-none mx-auto">
+                <div class="sticky top-0 z-20 mb-4">
+                    <div class="flex items-center flex-wrap gap-2">
+                        <button id="openSidebar" class="md:hidden text-white px-4 py-2 rounded-full shadow-lg flex items-center gap-2" style="background: var(--primary-color);">
+                            <i class="fa-solid fa-bars text-lg"></i>
+                            <span class="font-semibold">Menu</span>
+                        </button>
+                        {% if not (hide_user_ui | default(false)) %}
+                        <div class="ml-auto flex items-center gap-3 flex-wrap justify-end">
+                            <div id="welcome" class="text-sm text-gray-600 truncate max-w-[50vw]">
+                                {% if session.get('username') %}
+                                Welcome, <strong>{{ session.get('username') }}</strong>!
+                                {% if session.get('is_admin') %}
+                                <i class="fa-solid fa-crown text-amber-500" title="Administrator"></i>
+                                {% endif %}
+                                {% endif %}
+                            </div>
+                            {% if is_authed %}
+                            <a href="/logout" class="px-4 py-2 rounded-full bg-red-600 text-white hover:bg-red-700 font-semibold shadow-md hover:shadow-lg transition-all flex items-center gap-2">
+                                <i class="fa-solid fa-right-from-bracket"></i>
+                                <span>Logout</span>
+                            </a>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                <div id="globalFlashWrap" class="hidden">{% include "_flash.html" %}</div>
+                {% block content %}{% endblock %}
+            </div>
+        </main>
+    </div>
+    <script>
+        // Provide a global toast utility (single reusable toast element)
+        (function(){
+            if(window.globalToast) return;
+            const hostId='toastHost';
+            let toastEl=null; let hideTimer=null;
+            function ensure(){ let h=document.getElementById(hostId); if(!h){ h=document.createElement('div'); h.id=hostId; h.className='fixed top-4 right-4 z-50 pointer-events-none'; document.body.appendChild(h);} return h; }
+            function classFor(type){ return type==='error'?['bg-red-600']:(type==='success'?['bg-green-600']:(type==='info'?['bg-blue-600']:['bg-gray-800'])); }
+            window.globalToast=function(msg,type){ const host=ensure(); if(!toastEl){ toastEl=document.createElement('div'); host.appendChild(toastEl);} if(hideTimer){ clearTimeout(hideTimer); hideTimer=null; }
+                toastEl.className='pointer-events-auto inline-block px-3 py-2 rounded shadow text-sm text-white transition-opacity duration-200 '+classFor(type).join(' ');
+                toastEl.style.opacity='1'; toastEl.textContent=msg; 
+                hideTimer=setTimeout(()=>{ toastEl.style.opacity='0'; }, 2600); // fade start
+            };
+        })();
+        // Convert any server-rendered flash messages into toasts and remove the message box entirely
+        (function(){
+            const wrap = document.getElementById('globalFlashWrap');
+            if(!wrap) return;
+            const msgs = Array.from(wrap.querySelectorAll('.px-3, .flash-msg'));
+            if(!msgs.length){ wrap.remove(); return; }
+            const classify = (el)=>{
+                const cls = el.className;
+                if(/green/i.test(cls)) return 'success';
+                if(/red/i.test(cls)) return 'error';
+                if(/yellow|amber/i.test(cls)) return 'info';
+                return 'info';
+            };
+            msgs.forEach((el,i)=>{
+                const text = (el.textContent||'').trim();
+                setTimeout(()=>{ if(window.globalToast && text) globalToast(text, classify(el)); }, i*60);
+            });
+            // Remove box to prevent layout shift / duplication
+            setTimeout(()=>wrap.remove(), msgs.length*70 + 200);
+        })();
+        // Initialize app after DOM is ready
+        document.addEventListener('DOMContentLoaded', function(){
+            applyUserContext();
+            // Sidebar toggles
+            const sidebar = document.getElementById('sidebar');
+            document.getElementById('openSidebar')?.addEventListener('click', ()=> sidebar.classList.remove('-translate-x-full'));
+            document.getElementById('closeSidebar')?.addEventListener('click', ()=> sidebar.classList.add('-translate-x-full'));
+        });
+
+        function applyUserContext(){
+            const current = '{{ session.get("username", "") }}';
+            const adminName = '{{ config.admin_name }}';
+            const isAdmin = {{ 'true' if session.get('is_admin') else 'false' }};
+
+            // hidden inputs for forms
+            document.querySelectorAll('input[name="creator"]').forEach(function(i){ i.value = current; });
+            document.querySelectorAll('input[name="user"]').forEach(function(i){ i.value = current; });
+
+            // delete button visibility where data-creator is available
+            document.querySelectorAll('.delete-form').forEach(f => {
+                const creator = f.getAttribute('data-creator');
+                const allowed = isAdmin || current === creator;
+                f.style.display = allowed ? '' : 'none';
+            });
+
+            // Notice editor visibility if present
+            const nf = document.getElementById('noticeForm');
+            if (nf){
+                nf.style.display = isAdmin ? '' : 'none';
+                const userField = nf.querySelector('input[name="user"]');
+                if (userField) userField.value = current;
+            }
+        }
+    </script>
+</body>
+<!-- Phase 2 reminders API helper (progressive enhancement) -->
+<script src="/static/js/reminders_api.js"></script>
+</html>

@@ -1,0 +1,232 @@
+{% extends "base.html" %}
+
+{% block extra_head %}
+<style>
+    .setup-card {
+        background: var(--card-background-color);
+        border-radius: 12px;
+        padding: 2rem;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        margin-bottom: 2rem;
+    }
+    .step-number {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        background: var(--primary-color);
+        color: white;
+        border-radius: 50%;
+        font-weight: bold;
+        font-size: 16px;
+        margin-right: 12px;
+    }
+    .info-box {
+        background: rgba(59, 130, 246, 0.1);
+        border-left: 4px solid var(--primary-color);
+        padding: 1rem;
+        margin: 1.5rem 0;
+        border-radius: 4px;
+    }
+    .option-card {
+        background: var(--card-background-color);
+        border: 2px solid var(--secondary-color);
+        border-radius: 8px;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+        transition: all 0.2s;
+    }
+    .option-card:hover {
+        border-color: var(--primary-color);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    .credential-box {
+        background: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 6px;
+        padding: 1rem;
+        font-family: 'Courier New', monospace;
+        font-size: 0.9rem;
+        margin: 0.5rem 0;
+    }
+    .credential-box.hidden {
+        filter: blur(8px);
+        user-select: none;
+        cursor: pointer;
+    }
+    .qr-container {
+        display: flex;
+        justify-content: center;
+        padding: 1.5rem;
+        background: white;
+        border-radius: 8px;
+        margin: 1rem 0;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+    <div class="flex items-center justify-between mb-6">
+        <h1 class="text-3xl font-bold" style="color: var(--text-color);">
+            <i class="fa-solid fa-calendar-plus"></i> Add Family Calendar
+        </h1>
+    </div>
+
+    <div class="setup-card">
+        <div class="mb-6">
+            <h2 class="text-2xl font-bold mb-2" style="color: var(--text-color);">
+                Welcome, {{ username }}!
+            </h2>
+            <p class="text-gray-600" style="color: var(--text-color); opacity: 0.8;">
+                Add the shared family calendar to your iPhone, iPad, or Mac to stay in sync with everyone's schedules and reminders.
+            </p>
+        </div>
+
+        <div class="info-box">
+            <p class="font-semibold mb-2">
+                <i class="fa-solid fa-info-circle"></i> About the Family Calendar
+            </p>
+            <p class="text-sm" style="color: var(--text-color); opacity: 0.9;">
+                {% if can_write %}
+                You have <strong>write access</strong> to the family calendar! You can add, edit, and delete events both on the HomeHub website and through your calendar app.
+                {% else %}
+                This is a <strong>read-only</strong> calendar that shows all family events and reminders.
+                Only users with write permission can modify events. Ask the Administrator if you need write access.
+                {% endif %}
+            </p>
+        </div>
+
+        <!-- Option 1: iOS Profile Download (Recommended) -->
+        <div class="option-card">
+            <div class="flex items-start mb-3">
+                <span class="step-number">1</span>
+                <div class="flex-1">
+                    <h3 class="text-xl font-bold mb-1" style="color: var(--text-color);">
+                        One-Click Setup (Recommended for iOS/iPadOS)
+                    </h3>
+                    <p class="text-sm text-gray-600 mb-3" style="color: var(--text-color); opacity: 0.8;">
+                        Download and install a configuration profile to automatically add the calendar to your device.
+                    </p>
+                </div>
+            </div>
+            <div class="ml-11">
+                <a href="{{ url_for('main.download_family_calendar_profile') }}"
+                   class="btn btn-primary inline-flex items-center gap-2">
+                    <i class="fa-solid fa-download"></i>
+                    Download iOS Profile
+                </a>
+                <p class="text-xs text-gray-500 mt-2" style="color: var(--text-color); opacity: 0.7;">
+                    After downloading, open the file and follow the prompts to install. You may need to go to
+                    Settings → General → VPN & Device Management → Profile Downloaded to install it.
+                </p>
+            </div>
+        </div>
+
+        <!-- Option 2: Manual Setup -->
+        <div class="option-card">
+            <div class="flex items-start mb-3">
+                <span class="step-number">2</span>
+                <div class="flex-1">
+                    <h3 class="text-xl font-bold mb-1" style="color: var(--text-color);">
+                        Manual Setup
+                    </h3>
+                    <p class="text-sm text-gray-600 mb-3" style="color: var(--text-color); opacity: 0.8;">
+                        Add the calendar manually using the credentials below. Works for all devices.
+                    </p>
+                </div>
+            </div>
+            <div class="ml-11">
+                <details class="mb-3">
+                    <summary class="cursor-pointer font-semibold text-blue-600 hover:text-blue-700 mb-2">
+                        <i class="fa-solid fa-eye"></i> Show Setup Instructions
+                    </summary>
+                    <div class="mt-3 space-y-3">
+                        <div>
+                            <p class="font-semibold mb-1" style="color: var(--text-color);">For iPhone/iPad:</p>
+                            <ol class="list-decimal list-inside text-sm space-y-1 ml-4" style="color: var(--text-color); opacity: 0.9;">
+                                <li>Go to <strong>Settings</strong> → <strong>Calendar</strong> → <strong>Accounts</strong></li>
+                                <li>Tap <strong>Add Account</strong> → <strong>Other</strong></li>
+                                <li>Tap <strong>Add CalDAV Account</strong></li>
+                                <li>Enter the credentials below and tap <strong>Next</strong></li>
+                            </ol>
+                        </div>
+                        <div>
+                            <p class="font-semibold mb-1" style="color: var(--text-color);">For Mac:</p>
+                            <ol class="list-decimal list-inside text-sm space-y-1 ml-4" style="color: var(--text-color); opacity: 0.9;">
+                                <li>Open <strong>Calendar</strong> app</li>
+                                <li>Go to <strong>Calendar</strong> menu → <strong>Add Account</strong></li>
+                                <li>Select <strong>Other CalDAV Account</strong></li>
+                                <li>Enter the credentials below and click <strong>Sign In</strong></li>
+                            </ol>
+                        </div>
+
+                        <div class="border-t pt-3 mt-3">
+                            <p class="font-semibold mb-2" style="color: var(--text-color);">CalDAV Credentials:</p>
+
+                            <div class="space-y-2">
+                                <div>
+                                    <label class="text-sm font-medium" style="color: var(--text-color); opacity: 0.8;">Server:</label>
+                                    <div class="credential-box">{{ server_host }}{% if server_port %}:{{ server_port }}{% endif %}</div>
+                                </div>
+
+                                <div>
+                                    <label class="text-sm font-medium" style="color: var(--text-color); opacity: 0.8;">Username:</label>
+                                    <div class="credential-box">{{ caldav_username }}</div>
+                                </div>
+
+                                <div>
+                                    <label class="text-sm font-medium" style="color: var(--text-color); opacity: 0.8;">Password:</label>
+                                    <div class="credential-box">
+                                        (Your HomeHub password)
+                                    </div>
+                                    <p class="text-xs text-gray-500 mt-1" style="color: var(--text-color); opacity: 0.6;">
+                                        <i class="fa-solid fa-key"></i> Use the same password you use to log into HomeHub
+                                    </p>
+                                </div>
+
+                                <div>
+                                    <label class="text-sm font-medium" style="color: var(--text-color); opacity: 0.8;">Calendar URL:</label>
+                                    <div class="credential-box text-xs">{{ caldav_url }}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </details>
+            </div>
+        </div>
+
+        <!-- Help Section -->
+        <div class="info-box mt-6">
+            <p class="text-sm">
+                <i class="fa-solid fa-question-circle"></i> <strong>Need Help?</strong>
+                If you encounter any issues, ask the Administrator for assistance. The calendar should appear
+                in your Calendar app within a few minutes of adding it.
+            </p>
+        </div>
+
+        <!-- Continue to HomeHub -->
+        <div class="mt-6 text-center">
+            <a href="{{ url_for('main.index') }}" class="btn btn-primary">
+                <i class="fa-solid fa-home"></i> Continue to HomeHub
+            </a>
+        </div>
+    </div>
+</div>
+
+<script>
+// Auto-select text when clicking on credential boxes
+document.querySelectorAll('.credential-box:not(.hidden)').forEach(box => {
+    box.addEventListener('click', function() {
+        if (window.getSelection) {
+            const selection = window.getSelection();
+            const range = document.createRange();
+            range.selectNodeContents(this);
+            selection.removeAllRanges();
+            selection.addRange(range);
+        }
+    });
+});
+</script>
+{% endblock %}

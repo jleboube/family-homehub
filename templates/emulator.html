@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ game_name }} - {{ console_name }}</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background: #1a1a2e;
+            font-family: 'Arial', sans-serif;
+            color: white;
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+        }
+        .header h1 {
+            font-size: 1.5rem;
+            margin: 0;
+        }
+        .back-btn {
+            padding: 8px 16px;
+            background: rgba(255,255,255,0.2);
+            border: 2px solid white;
+            border-radius: 5px;
+            color: white;
+            text-decoration: none;
+            font-weight: bold;
+            transition: all 0.2s;
+        }
+        .back-btn:hover {
+            background: rgba(255,255,255,0.3);
+        }
+        .emulator-container {
+            width: 100vw;
+            height: calc(100vh - 60px);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        #game {
+            width: 100%;
+            height: 100%;
+            max-width: 1024px;
+            max-height: 768px;
+            border-radius: 10px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+        }
+        .loading {
+            text-align: center;
+            padding: 40px;
+        }
+        .loading-spinner {
+            border: 4px solid rgba(255,255,255,0.1);
+            border-top: 4px solid white;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .controls-help {
+            background: rgba(0,0,0,0.7);
+            padding: 15px;
+            margin: 20px;
+            border-radius: 10px;
+            font-size: 0.9rem;
+        }
+        .controls-help h3 {
+            margin-bottom: 10px;
+            color: #667eea;
+        }
+        .controls-help ul {
+            list-style: none;
+            padding: 0;
+        }
+        .controls-help li {
+            padding: 5px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>{{ game_name }}</h1>
+        <a href="/games" class="back-btn">← Back to Games</a>
+    </div>
+
+    <div class="emulator-container">
+        <div id="game"></div>
+    </div>
+
+    <div class="controls-help">
+        <h3>Controls:</h3>
+        <ul>
+            <li><strong>Arrow Keys:</strong> D-Pad</li>
+            <li><strong>Z / X / A / S:</strong> Action Buttons</li>
+            <li><strong>Enter:</strong> Start</li>
+            <li><strong>Shift:</strong> Select</li>
+            <li><strong>F11:</strong> Fullscreen</li>
+        </ul>
+    </div>
+
+    <script>
+        // EmulatorJS Configuration - Using UNPKG CDN
+        window.EJS_player = '#game';
+        window.EJS_core = '{{ core }}';
+        window.EJS_gameUrl = '{{ rom_url }}';
+        window.EJS_pathtodata = 'https://unpkg.com/emulatorjs@latest/data/';
+        window.EJS_gameName = '{{ game_name }}';
+
+        // Optional settings
+        window.EJS_biosUrl = '';
+        window.EJS_gameID = '';
+        window.EJS_backgroundColor = '#1a1a2e';
+        window.EJS_color = '#667eea';
+        window.EJS_startOnLoaded = true;
+        window.EJS_loadingScreen = `
+            <div class="loading">
+                <div class="loading-spinner"></div>
+                <h2>Loading {{ game_name }}...</h2>
+                <p>Initializing emulator...</p>
+            </div>
+        `;
+
+        // Debug logging
+        console.log('EmulatorJS Config:', {
+            core: window.EJS_core,
+            gameUrl: window.EJS_gameUrl,
+            gameName: window.EJS_gameName,
+            pathtodata: window.EJS_pathtodata
+        });
+
+        // Error handling
+        window.addEventListener('error', function(e) {
+            console.error('Page error:', e.error, e.filename, e.lineno);
+        });
+
+        // Test if ROM is accessible
+        fetch(window.EJS_gameUrl, { method: 'HEAD' })
+            .then(response => {
+                console.log('ROM file check:', response.ok ? 'accessible' : 'not accessible', response.status);
+            })
+            .catch(error => {
+                console.error('ROM file check failed:', error);
+            });
+    </script>
+    <script src="https://unpkg.com/emulatorjs@latest/data/loader.js"
+            onerror="console.error('Failed to load EmulatorJS loader'); document.getElementById('game').innerHTML = '<div class=\'loading\'><h2 style=\'color: red;\'>Error: Failed to load emulator library</h2><p>Unable to load from CDN.</p></div>';"></script>
+</body>
+</html>
