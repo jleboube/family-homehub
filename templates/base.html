@@ -323,6 +323,11 @@
             const adminName = '{{ config.admin_name }}';
             const isAdmin = {{ 'true' if session.get('is_admin') else 'false' }};
 
+            // Store username in localStorage for client-side forms
+            if (current) {
+                localStorage.setItem('username', current);
+            }
+
             // hidden inputs for forms
             document.querySelectorAll('input[name="creator"]').forEach(function(i){ i.value = current; });
             document.querySelectorAll('input[name="user"]').forEach(function(i){ i.value = current; });
