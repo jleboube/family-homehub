@@ -2,9 +2,6 @@
 data/
 database.db
 
-# RomM db
-/romm-db
-
 # User-uploaded files
 uploads/
 media/
@@ -16,6 +13,10 @@ games/*/
 radicale-data/
 radicale-config/
 vaultwarden-data/
+romm-db/
+romm-config/
+romm-library/
+romm-resources/
 
 # Python cache files
 *.pyc
