@@ -2,9 +2,6 @@
 data/
 database.db
 
-# ROMM database files
-romm-db/
-
 # User-uploaded files
 uploads/
 media/

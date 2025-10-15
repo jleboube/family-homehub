@@ -35,6 +35,10 @@ def reload_config_and_auth():
     if endpoint == 'main.chess_game' and request.args.get('game_id'):
         return
 
+    # Skip authentication for chess API endpoints (remote multiplayer)
+    if endpoint in ('main.create_remote_chess_game', 'main.get_chess_game', 'main.submit_chess_move'):
+        return
+
     # Check if user is authenticated
     user_id = session.get('user_id')
     if not user_id:

@@ -1,4 +1,5 @@
 instance_name: "Familty Home Hub"
+#password: "" #leave blank for password less access
 admin_name: "Administrator"
 feature_toggles:
   shopping_list: true
