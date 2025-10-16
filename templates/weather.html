@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="mx-auto max-w-4xl">
+<div class="mx-auto max-w-6xl">
     <div class="flex items-center justify-between mb-6">
         <h2 class="text-3xl font-bold"><i class="fa-solid fa-cloud-sun text-sky-600 mr-2"></i>Weather</h2>
         <button onclick="refreshWeather()" class="btn btn-primary">
@@ -11,7 +11,7 @@
     <!-- Location Input -->
     <div class="card p-6 mb-6">
         <div class="flex gap-2">
-            <input type="text" id="locationInput" class="flex-1 p-3 border rounded-lg" placeholder="Enter city name or ZIP code..." value="{{ location or '' }}">
+            <input type="text" id="locationInput" class="flex-1 p-3 border rounded-lg" placeholder="Enter city name or ZIP code..." value="47725">
             <button onclick="updateLocation()" class="btn btn-primary px-6">
                 <i class="fa-solid fa-search mr-2"></i>Search
             </button>
@@ -21,110 +21,274 @@
         </div>
     </div>
 
-    <!-- Current Weather -->
-    <div id="currentWeather" class="card p-8 mb-6 bg-gradient-to-br from-blue-400 to-sky-300 text-white">
-        <div class="text-center mb-6">
-            <h3 class="text-3xl font-bold mb-2" id="cityName">{{ weather.location if weather else 'Loading...' }}</h3>
-            <p class="text-lg opacity-90" id="currentDate"></p>
-        </div>
-
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div class="text-center">
-                <i id="weatherIcon" class="fa-solid {{ weather.icon if weather else 'fa-cloud-sun' }} text-8xl mb-4"></i>
-                <p class="text-xl font-semibold" id="weatherDesc">{{ weather.description if weather else '--' }}</p>
-            </div>
-
-            <div class="text-center">
-                <p class="text-7xl font-bold" id="temperature">{{ weather.temp if weather else '--' }}°</p>
-                <p class="text-lg mt-2">Feels like <span id="feelsLike">{{ weather.feels_like if weather else '--' }}°</span></p>
-            </div>
-
-            <div class="space-y-3">
-                <div class="flex justify-between items-center bg-white bg-opacity-20 rounded-lg p-3">
-                    <span><i class="fa-solid fa-droplet mr-2"></i>Humidity</span>
-                    <span class="font-bold" id="humidity">{{ weather.humidity if weather else '--' }}%</span>
-                </div>
-                <div class="flex justify-between items-center bg-white bg-opacity-20 rounded-lg p-3">
-                    <span><i class="fa-solid fa-wind mr-2"></i>Wind Speed</span>
-                    <span class="font-bold" id="windSpeed">{{ weather.wind_speed if weather else '--' }} mph</span>
-                </div>
-                <div class="flex justify-between items-center bg-white bg-opacity-20 rounded-lg p-3">
-                    <span><i class="fa-solid fa-gauge mr-2"></i>Pressure</span>
-                    <span class="font-bold" id="pressure">{{ weather.pressure if weather else '--' }} mb</span>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- 5-Day Forecast -->
-    <div class="card p-6">
-        <h3 class="text-xl font-bold mb-4">5-Day Forecast</h3>
-        <div id="forecast" class="grid grid-cols-2 md:grid-cols-5 gap-4">
-            {% if weather and weather.forecast %}
-                {% for day in weather.forecast %}
-                <div class="text-center p-4 bg-gray-50 rounded-lg">
-                    <p class="font-bold text-lg mb-2">{{ day.day }}</p>
-                    <i class="fa-solid {{ day.icon }} text-4xl text-blue-500 mb-2"></i>
-                    <p class="text-sm text-gray-600 mb-2">{{ day.description }}</p>
-                    <div class="flex justify-center gap-2">
-                        <span class="font-bold text-lg">{{ day.temp_high }}°</span>
-                        <span class="text-gray-500">{{ day.temp_low }}°</span>
-                    </div>
-                </div>
-                {% endfor %}
-            {% else %}
-            <div class="text-center text-gray-500 col-span-full py-8">
-                Enter a location to see the forecast
-            </div>
-            {% endif %}
+    <div id="weatherContainer">
+        <div class="text-center py-12 text-gray-500">
+            <i class="fa-solid fa-spinner fa-spin text-4xl mb-4"></i>
+            <p>Loading weather data...</p>
         </div>
     </div>
 </div>
 
 <script>
-// Update current date
-document.getElementById('currentDate').textContent = new Date().toLocaleDateString('en-US', {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
-});
+// Weather code to icon mapping (Open-Meteo WMO codes)
+const weatherIcons = {
+    0: { icon: 'fa-sun', desc: 'Clear Sky', color: 'text-yellow-500' },
+    1: { icon: 'fa-cloud-sun', desc: 'Mainly Clear', color: 'text-blue-400' },
+    2: { icon: 'fa-cloud-sun', desc: 'Partly Cloudy', color: 'text-gray-400' },
+    3: { icon: 'fa-cloud', desc: 'Overcast', color: 'text-gray-500' },
+    45: { icon: 'fa-smog', desc: 'Foggy', color: 'text-gray-400' },
+    48: { icon: 'fa-smog', desc: 'Foggy', color: 'text-gray-400' },
+    51: { icon: 'fa-cloud-rain', desc: 'Light Drizzle', color: 'text-blue-500' },
+    53: { icon: 'fa-cloud-rain', desc: 'Moderate Drizzle', color: 'text-blue-500' },
+    55: { icon: 'fa-cloud-rain', desc: 'Dense Drizzle', color: 'text-blue-600' },
+    56: { icon: 'fa-snowflake', desc: 'Light Freezing Drizzle', color: 'text-cyan-400' },
+    57: { icon: 'fa-snowflake', desc: 'Freezing Drizzle', color: 'text-cyan-500' },
+    61: { icon: 'fa-cloud-showers-heavy', desc: 'Light Rain', color: 'text-blue-500' },
+    63: { icon: 'fa-cloud-showers-heavy', desc: 'Moderate Rain', color: 'text-blue-600' },
+    65: { icon: 'fa-cloud-showers-heavy', desc: 'Heavy Rain', color: 'text-blue-700' },
+    66: { icon: 'fa-snowflake', desc: 'Light Freezing Rain', color: 'text-cyan-400' },
+    67: { icon: 'fa-snowflake', desc: 'Freezing Rain', color: 'text-cyan-500' },
+    71: { icon: 'fa-snowflake', desc: 'Light Snow', color: 'text-blue-300' },
+    73: { icon: 'fa-snowflake', desc: 'Moderate Snow', color: 'text-blue-400' },
+    75: { icon: 'fa-snowflake', desc: 'Heavy Snow', color: 'text-blue-500' },
+    77: { icon: 'fa-snowflake', desc: 'Snow Grains', color: 'text-blue-400' },
+    80: { icon: 'fa-cloud-showers-heavy', desc: 'Light Showers', color: 'text-blue-500' },
+    81: { icon: 'fa-cloud-showers-heavy', desc: 'Moderate Showers', color: 'text-blue-600' },
+    82: { icon: 'fa-cloud-showers-heavy', desc: 'Heavy Showers', color: 'text-blue-700' },
+    85: { icon: 'fa-snowflake', desc: 'Light Snow Showers', color: 'text-blue-300' },
+    86: { icon: 'fa-snowflake', desc: 'Heavy Snow Showers', color: 'text-blue-400' },
+    95: { icon: 'fa-bolt', desc: 'Thunderstorm', color: 'text-yellow-600' },
+    96: { icon: 'fa-bolt', desc: 'Thunderstorm with Hail', color: 'text-purple-600' },
+    99: { icon: 'fa-bolt', desc: 'Severe Thunderstorm', color: 'text-red-600' }
+};
 
-function updateWeatherDisplay(weather) {
-    document.getElementById('cityName').textContent = weather.location;
-    document.getElementById('temperature').textContent = weather.temp + '°';
-    document.getElementById('feelsLike').textContent = weather.feels_like + '°';
-    document.getElementById('humidity').textContent = weather.humidity + '%';
-    document.getElementById('windSpeed').textContent = weather.wind_speed + ' mph';
-    document.getElementById('pressure').textContent = weather.pressure + ' mb';
-    document.getElementById('weatherDesc').textContent = weather.description;
-
-    // Update weather icon
-    const iconEl = document.getElementById('weatherIcon');
-    iconEl.className = 'fa-solid ' + weather.icon + ' text-8xl mb-4';
-
-    // Update forecast
-    updateForecastDisplay(weather.forecast || []);
+function getWeatherInfo(code) {
+    return weatherIcons[code] || { icon: 'fa-cloud', desc: 'Unknown', color: 'text-gray-500' };
 }
 
-function updateForecastDisplay(forecast) {
-    const forecastEl = document.getElementById('forecast');
-    if (!forecast || forecast.length === 0) {
-        forecastEl.innerHTML = '<div class="text-center text-gray-500 col-span-full py-8">No forecast data available</div>';
-        return;
-    }
+function getUVLevel(uv) {
+    if (uv <= 2) return { level: 'Low', color: 'text-green-600', bg: 'bg-green-100' };
+    if (uv <= 5) return { level: 'Moderate', color: 'text-yellow-600', bg: 'bg-yellow-100' };
+    if (uv <= 7) return { level: 'High', color: 'text-orange-600', bg: 'bg-orange-100' };
+    if (uv <= 10) return { level: 'Very High', color: 'text-red-600', bg: 'bg-red-100' };
+    return { level: 'Extreme', color: 'text-purple-600', bg: 'bg-purple-100' };
+}
 
-    forecastEl.innerHTML = forecast.map(day => `
-        <div class="text-center p-4 bg-gray-50 rounded-lg">
-            <p class="font-bold text-lg mb-2">${day.day}</p>
-            <i class="fa-solid ${day.icon} text-4xl text-blue-500 mb-2"></i>
-            <p class="text-sm text-gray-600 mb-2">${day.description}</p>
-            <div class="flex justify-center gap-2">
-                <span class="font-bold text-lg">${day.temp_high}°</span>
-                <span class="text-gray-500">${day.temp_low}°</span>
+function renderWeather(data) {
+    const container = document.getElementById('weatherContainer');
+    const current = data.current;
+    const today = data.today;
+    const location = data.location || 'Unknown';
+
+    const weatherInfo = getWeatherInfo(current.weather_code);
+    const iconColor = current.is_day ? weatherInfo.color : 'text-indigo-400';
+    const uvInfo = getUVLevel(current.uv_index);
+
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+    container.innerHTML = `
+        <!-- PRIMARY DATA: Current Conditions -->
+        <div class="card p-8 mb-6 bg-gradient-to-br from-blue-400 to-sky-300 text-white">
+            <div class="text-center mb-6">
+                <h3 class="text-3xl font-bold mb-2">${location}</h3>
+                <p class="text-lg opacity-90">${dateStr}</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="text-center">
+                    <i class="fa-solid ${weatherInfo.icon} text-8xl mb-4"></i>
+                    <p class="text-xl font-semibold">${weatherInfo.desc}</p>
+                </div>
+
+                <div class="text-center">
+                    <p class="text-7xl font-bold">${Math.round(current.temperature)}°F</p>
+                    <p class="text-lg mt-2">Feels like ${Math.round(current.feels_like)}°F</p>
+                    <div class="flex gap-4 justify-center mt-3">
+                        <span><i class="fa-solid fa-arrow-up text-red-300"></i> ${Math.round(today.high)}°</span>
+                        <span><i class="fa-solid fa-arrow-down text-blue-200"></i> ${Math.round(today.low)}°</span>
+                    </div>
+                </div>
+
+                <div class="space-y-3">
+                    <div class="flex justify-between items-center bg-white bg-opacity-20 rounded-lg p-3">
+                        <span><i class="fa-solid fa-droplet mr-2"></i>Humidity</span>
+                        <span class="font-bold">${current.humidity}%</span>
+                    </div>
+                    <div class="flex justify-between items-center bg-white bg-opacity-20 rounded-lg p-3">
+                        <span><i class="fa-solid fa-wind mr-2"></i>Wind</span>
+                        <span class="font-bold">${Math.round(current.wind_speed)} mph ${current.wind_direction}</span>
+                    </div>
+                    <div class="flex justify-between items-center bg-white bg-opacity-20 rounded-lg p-3">
+                        <span><i class="fa-solid fa-gauge mr-2"></i>Pressure</span>
+                        <span class="font-bold">${current.pressure} mb</span>
+                    </div>
+                </div>
             </div>
         </div>
-    `).join('');
+
+        <!-- SECONDARY DATA: Additional Details (Expandable) -->
+        <div class="card p-6 mb-6">
+            <button onclick="toggleSection('detailsSection')" class="w-full flex items-center justify-between text-xl font-bold mb-4 hover:text-blue-600">
+                <span><i class="fa-solid fa-circle-info text-blue-600 mr-2"></i>Current Conditions Details</span>
+                <i class="fa-solid fa-chevron-down transition-transform" id="detailsSection-icon"></i>
+            </button>
+            <div id="detailsSection" class="hidden">
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div class="bg-gray-50 dark:bg-slate-800 p-4 rounded-lg text-center">
+                        <i class="fa-solid fa-wind text-blue-500 text-2xl mb-2"></i>
+                        <div class="text-sm text-gray-600 dark:text-gray-400">Wind Gusts</div>
+                        <div class="text-xl font-bold">${Math.round(current.wind_gusts)} mph</div>
+                    </div>
+                    <div class="bg-gray-50 dark:bg-slate-800 p-4 rounded-lg text-center">
+                        <i class="fa-solid fa-sun text-yellow-500 text-2xl mb-2"></i>
+                        <div class="text-sm text-gray-600 dark:text-gray-400">UV Index</div>
+                        <div class="text-xl font-bold ${uvInfo.color}">${current.uv_index} <span class="text-sm">${uvInfo.level}</span></div>
+                    </div>
+                    <div class="bg-gray-50 dark:bg-slate-800 p-4 rounded-lg text-center">
+                        <i class="fa-solid fa-eye text-gray-500 text-2xl mb-2"></i>
+                        <div class="text-sm text-gray-600 dark:text-gray-400">Visibility</div>
+                        <div class="text-xl font-bold">${current.visibility} mi</div>
+                    </div>
+                    <div class="bg-gray-50 dark:bg-slate-800 p-4 rounded-lg text-center">
+                        <i class="fa-solid fa-cloud text-gray-400 text-2xl mb-2"></i>
+                        <div class="text-sm text-gray-600 dark:text-gray-400">Cloud Cover</div>
+                        <div class="text-xl font-bold">${current.cloud_cover}%</div>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                    <div class="bg-gradient-to-r from-orange-100 to-orange-50 dark:from-orange-900/30 dark:to-orange-800/20 p-4 rounded-lg">
+                        <div class="flex items-center gap-3 mb-2">
+                            <i class="fa-solid fa-sun text-orange-500 text-2xl"></i>
+                            <div>
+                                <div class="text-sm text-gray-600 dark:text-gray-400">Sunrise</div>
+                                <div class="text-lg font-bold">${today.sunrise}</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-gradient-to-r from-indigo-100 to-indigo-50 dark:from-indigo-900/30 dark:to-indigo-800/20 p-4 rounded-lg">
+                        <div class="flex items-center gap-3 mb-2">
+                            <i class="fa-solid fa-moon text-indigo-500 text-2xl"></i>
+                            <div>
+                                <div class="text-sm text-gray-600 dark:text-gray-400">Sunset</div>
+                                <div class="text-lg font-bold">${today.sunset}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SECONDARY DATA: 24-Hour Forecast -->
+        <div class="card p-6 mb-6">
+            <button onclick="toggleSection('hourlySection')" class="w-full flex items-center justify-between text-xl font-bold mb-4 hover:text-blue-600">
+                <span><i class="fa-solid fa-clock text-blue-600 mr-2"></i>24-Hour Forecast</span>
+                <i class="fa-solid fa-chevron-down transition-transform" id="hourlySection-icon"></i>
+            </button>
+            <div id="hourlySection" class="hidden">
+                <div class="overflow-x-auto">
+                    <div class="flex gap-3 pb-2" style="min-width: max-content;">
+                        ${data.hourly.map(hour => {
+                            const hInfo = getWeatherInfo(hour.weather_code);
+                            return `
+                                <div class="bg-gray-50 dark:bg-slate-800 p-3 rounded-lg text-center" style="min-width: 100px;">
+                                    <div class="font-semibold text-sm mb-2">${hour.hour}</div>
+                                    <i class="fa-solid ${hInfo.icon} ${hInfo.color} text-2xl mb-2"></i>
+                                    <div class="text-xl font-bold">${Math.round(hour.temperature)}°</div>
+                                    <div class="text-xs text-blue-600 mt-1">
+                                        <i class="fa-solid fa-droplet"></i> ${hour.precipitation_prob}%
+                                    </div>
+                                    <div class="text-xs text-gray-500 mt-1">
+                                        <i class="fa-solid fa-wind"></i> ${Math.round(hour.wind_speed)} mph
+                                    </div>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SECONDARY DATA: 5-Day Forecast -->
+        <div class="card p-6">
+            <h3 class="text-xl font-bold mb-4"><i class="fa-solid fa-calendar-days text-blue-600 mr-2"></i>5-Day Forecast</h3>
+            <div class="space-y-3">
+                ${data.forecast.map((day, idx) => {
+                    const dInfo = getWeatherInfo(day.weather_code);
+                    const uvDay = getUVLevel(day.uv_max);
+                    return `
+                        <div class="bg-gray-50 dark:bg-slate-800 p-4 rounded-lg">
+                            <button onclick="toggleSection('day${idx}')" class="w-full flex items-center justify-between hover:bg-gray-100 dark:hover:bg-slate-700 rounded p-2 -m-2">
+                                <div class="flex items-center gap-4 flex-1">
+                                    <div class="font-bold text-lg w-24">${day.day}</div>
+                                    <i class="fa-solid ${dInfo.icon} ${dInfo.color} text-3xl"></i>
+                                    <div class="text-sm text-gray-600 dark:text-gray-400 flex-1 text-left">${dInfo.desc}</div>
+                                    <div class="flex gap-3 items-center">
+                                        <span class="font-bold text-lg"><i class="fa-solid fa-arrow-up text-red-500 text-xs"></i> ${Math.round(day.high)}°</span>
+                                        <span class="text-gray-600"><i class="fa-solid fa-arrow-down text-blue-500 text-xs"></i> ${Math.round(day.low)}°</span>
+                                    </div>
+                                </div>
+                                <i class="fa-solid fa-chevron-down transition-transform ml-3" id="day${idx}-icon"></i>
+                            </button>
+                            <!-- TERTIARY DATA: Detailed day info -->
+                            <div id="day${idx}" class="hidden mt-3 pt-3 border-t dark:border-slate-700">
+                                <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                                    <div class="text-center">
+                                        <i class="fa-solid fa-sun text-orange-500 mb-1"></i>
+                                        <div class="text-xs text-gray-600 dark:text-gray-400">Sunrise</div>
+                                        <div class="font-semibold">${day.sunrise}</div>
+                                    </div>
+                                    <div class="text-center">
+                                        <i class="fa-solid fa-moon text-indigo-500 mb-1"></i>
+                                        <div class="text-xs text-gray-600 dark:text-gray-400">Sunset</div>
+                                        <div class="font-semibold">${day.sunset}</div>
+                                    </div>
+                                    <div class="text-center">
+                                        <i class="fa-solid fa-sun text-yellow-500 mb-1"></i>
+                                        <div class="text-xs text-gray-600 dark:text-gray-400">UV Index</div>
+                                        <div class="font-semibold ${uvDay.color}">${day.uv_max} ${uvDay.level}</div>
+                                    </div>
+                                    <div class="text-center">
+                                        <i class="fa-solid fa-cloud-rain text-blue-500 mb-1"></i>
+                                        <div class="text-xs text-gray-600 dark:text-gray-400">Rain Chance</div>
+                                        <div class="font-semibold">${day.precipitation_prob}%</div>
+                                    </div>
+                                    <div class="text-center">
+                                        <i class="fa-solid fa-droplet text-blue-600 mb-1"></i>
+                                        <div class="text-xs text-gray-600 dark:text-gray-400">Precipitation</div>
+                                        <div class="font-semibold">${day.precipitation_sum} in</div>
+                                    </div>
+                                    <div class="text-center">
+                                        <i class="fa-solid fa-wind text-gray-500 mb-1"></i>
+                                        <div class="text-xs text-gray-600 dark:text-gray-400">Wind Max</div>
+                                        <div class="font-semibold">${Math.round(day.wind_max)} mph</div>
+                                    </div>
+                                    <div class="text-center">
+                                        <i class="fa-solid fa-wind text-gray-600 mb-1"></i>
+                                        <div class="text-xs text-gray-600 dark:text-gray-400">Gusts Max</div>
+                                        <div class="font-semibold">${Math.round(day.wind_gusts_max)} mph</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('')}
+            </div>
+        </div>
+    `;
+}
+
+function toggleSection(id) {
+    const section = document.getElementById(id);
+    const icon = document.getElementById(id + '-icon');
+
+    if (section.classList.contains('hidden')) {
+        section.classList.remove('hidden');
+        icon.style.transform = 'rotate(180deg)';
+    } else {
+        section.classList.add('hidden');
+        icon.style.transform = 'rotate(0deg)';
+    }
 }
 
 function updateLocation() {
@@ -134,23 +298,25 @@ function updateLocation() {
         return;
     }
 
-    fetch('/weather/update', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ location })
-    })
-    .then(r => r.json())
-    .then(data => {
-        if (data.success && data.weather) {
-            updateWeatherDisplay(data.weather);
-            if (window.globalToast) globalToast('Weather updated!', 'success');
-        } else {
-            if (window.globalToast) globalToast('Error: ' + (data.error || 'Could not fetch weather'), 'error');
-        }
-    })
-    .catch(err => {
-        if (window.globalToast) globalToast('Error fetching weather', 'error');
-    });
+    const container = document.getElementById('weatherContainer');
+    container.innerHTML = '<div class="text-center py-12 text-gray-500"><i class="fa-solid fa-spinner fa-spin text-4xl mb-4"></i><p>Loading weather data...</p></div>';
+
+    fetch('/api/weather?zip=' + encodeURIComponent(location))
+        .then(r => r.json())
+        .then(data => {
+            if (data.error) {
+                container.innerHTML = `<div class="card p-8 text-center text-red-600"><i class="fa-solid fa-triangle-exclamation text-4xl mb-4"></i><p>${data.error}</p></div>`;
+                if (window.globalToast) globalToast('Error: ' + data.error, 'error');
+            } else {
+                renderWeather(data);
+                if (window.globalToast) globalToast('Weather updated!', 'success');
+            }
+        })
+        .catch(err => {
+            console.error('Weather fetch error:', err);
+            container.innerHTML = '<div class="card p-8 text-center text-red-600"><i class="fa-solid fa-triangle-exclamation text-4xl mb-4"></i><p>Failed to load weather data</p></div>';
+            if (window.globalToast) globalToast('Error fetching weather', 'error');
+        });
 }
 
 function useGeolocation() {
@@ -165,24 +331,25 @@ function useGeolocation() {
         const lat = position.coords.latitude;
         const lon = position.coords.longitude;
 
-        fetch('/weather/update', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ lat, lon })
-        })
-        .then(r => r.json())
-        .then(data => {
-            if (data.success && data.weather) {
-                updateWeatherDisplay(data.weather);
-                document.getElementById('locationInput').value = data.weather.location;
-                if (window.globalToast) globalToast('Weather updated for your location!', 'success');
-            } else {
-                if (window.globalToast) globalToast('Could not fetch weather for your location', 'error');
-            }
-        })
-        .catch(err => {
-            if (window.globalToast) globalToast('Error fetching weather', 'error');
-        });
+        const container = document.getElementById('weatherContainer');
+        container.innerHTML = '<div class="text-center py-12 text-gray-500"><i class="fa-solid fa-spinner fa-spin text-4xl mb-4"></i><p>Loading weather data...</p></div>';
+
+        fetch(`/api/weather?lat=${lat}&lon=${lon}`)
+            .then(r => r.json())
+            .then(data => {
+                if (data.error) {
+                    container.innerHTML = `<div class="card p-8 text-center text-red-600"><i class="fa-solid fa-triangle-exclamation text-4xl mb-4"></i><p>${data.error}</p></div>`;
+                } else {
+                    renderWeather(data);
+                    document.getElementById('locationInput').value = data.location || '';
+                    if (window.globalToast) globalToast('Weather updated for your location!', 'success');
+                }
+            })
+            .catch(err => {
+                console.error('Weather fetch error:', err);
+                container.innerHTML = '<div class="card p-8 text-center text-red-600"><i class="fa-solid fa-triangle-exclamation text-4xl mb-4"></i><p>Failed to load weather data</p></div>';
+                if (window.globalToast) globalToast('Error fetching weather', 'error');
+            });
     }, (error) => {
         let errorMsg = 'Could not get your location';
         if (error.code === error.PERMISSION_DENIED) {
@@ -199,7 +366,6 @@ function useGeolocation() {
 function refreshWeather() {
     const location = document.getElementById('locationInput').value || '47725';
     if (location) {
-        document.getElementById('locationInput').value = location;
         updateLocation();
     }
 }
@@ -209,6 +375,11 @@ document.getElementById('locationInput').addEventListener('keypress', function(e
     if (e.key === 'Enter') {
         updateLocation();
     }
+});
+
+// Load default weather on page load
+window.addEventListener('DOMContentLoaded', function() {
+    updateLocation();
 });
 </script>
 {% endblock %}

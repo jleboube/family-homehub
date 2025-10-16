@@ -2521,11 +2521,20 @@ def get_weather_data(location=None, lat=None, lon=None):
             print("[DEBUG] No lat/lon available")
             return None
 
-        # Fetch weather from Open-Meteo (including 5-day forecast)
-        weather_url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m,pressure_msl&daily=weather_code,temperature_2m_max,temperature_2m_min&temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch&timezone=auto&forecast_days=6"
+        # Fetch comprehensive weather from Open-Meteo (all free data)
+        weather_url = (
+            f"https://api.open-meteo.com/v1/forecast?"
+            f"latitude={lat}&longitude={lon}&"
+            f"current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,"
+            f"wind_speed_10m,wind_direction_10m,wind_gusts_10m,pressure_msl,cloud_cover,visibility,uv_index,is_day&"
+            f"hourly=temperature_2m,precipitation_probability,weather_code,wind_speed_10m,relative_humidity_2m&"
+            f"daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,uv_index_max,"
+            f"precipitation_probability_max,precipitation_sum,wind_speed_10m_max,wind_gusts_10m_max&"
+            f"temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch&timezone=auto&forecast_days=7"
+        )
         print(f"[DEBUG] Weather URL: {weather_url}")
 
-        weather_response = requests.get(weather_url, timeout=5)
+        weather_response = requests.get(weather_url, timeout=10)
         print(f"[DEBUG] Weather response status: {weather_response.status_code}")
         if not weather_response.ok:
             print("[DEBUG] Weather API request failed")
@@ -2533,13 +2542,53 @@ def get_weather_data(location=None, lat=None, lon=None):
 
         data = weather_response.json()
         current = data.get('current', {})
+        hourly = data.get('hourly', {})
         daily = data.get('daily', {})
         print(f"[DEBUG] Weather data: {current}")
-        print(f"[DEBUG] Daily forecast data: {daily}")
+        print(f"[DEBUG] Daily forecast data keys: {daily.keys() if daily else 'None'}")
 
         # Map weather codes to descriptions and icons
         weather_code = current.get('weather_code', 0)
         weather_desc, weather_icon = map_weather_code(weather_code)
+
+        # Wind direction to compass
+        def wind_direction_to_compass(degrees):
+            if degrees is None:
+                return "N/A"
+            directions = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE",
+                         "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"]
+            idx = round(degrees / 22.5) % 16
+            return directions[idx]
+
+        # Process hourly forecast (next 24 hours)
+        hourly_list = []
+        if hourly:
+            h_times = hourly.get('time', [])
+            h_temps = hourly.get('temperature_2m', [])
+            h_precip_prob = hourly.get('precipitation_probability', [])
+            h_weather_codes = hourly.get('weather_code', [])
+            h_wind_speeds = hourly.get('wind_speed_10m', [])
+            h_humidity = hourly.get('relative_humidity_2m', [])
+
+            # Get next 24 hours
+            for i in range(min(24, len(h_times))):
+                try:
+                    time_obj = datetime.fromisoformat(h_times[i].replace('Z', '+00:00'))
+                    hour_display = time_obj.strftime('%I %p')  # 12-hour format
+                    h_desc, h_icon = map_weather_code(h_weather_codes[i] if i < len(h_weather_codes) else 0)
+
+                    hourly_list.append({
+                        'time': hour_display,
+                        'temp': round(h_temps[i]) if i < len(h_temps) else 0,
+                        'precip_prob': h_precip_prob[i] if i < len(h_precip_prob) else 0,
+                        'icon': h_icon,
+                        'description': h_desc,
+                        'wind_speed': round(h_wind_speeds[i], 1) if i < len(h_wind_speeds) else 0,
+                        'humidity': h_humidity[i] if i < len(h_humidity) else 0
+                    })
+                except (IndexError, ValueError) as e:
+                    print(f"[DEBUG] Error processing hourly {i}: {e}")
+                    continue
 
         # Process 5-day forecast (skip today, take next 5 days)
         forecast_list = []
@@ -2548,6 +2597,13 @@ def get_weather_data(location=None, lat=None, lon=None):
             weather_codes = daily.get('weather_code', [])
             temp_max = daily.get('temperature_2m_max', [])
             temp_min = daily.get('temperature_2m_min', [])
+            sunrise = daily.get('sunrise', [])
+            sunset = daily.get('sunset', [])
+            uv_max = daily.get('uv_index_max', [])
+            precip_prob = daily.get('precipitation_probability_max', [])
+            precip_sum = daily.get('precipitation_sum', [])
+            wind_max = daily.get('wind_speed_10m_max', [])
+            gust_max = daily.get('wind_gusts_10m_max', [])
 
             # Skip first day (today), take next 5
             for i in range(1, min(6, len(dates))):
@@ -2556,17 +2612,44 @@ def get_weather_data(location=None, lat=None, lon=None):
                     day_name = date_obj.strftime('%a')  # Mon, Tue, etc.
                     fc_desc, fc_icon = map_weather_code(weather_codes[i])
 
+                    # Parse sunrise/sunset
+                    sunrise_time = datetime.fromisoformat(sunrise[i].replace('Z', '+00:00')).strftime('%I:%M %p') if i < len(sunrise) and sunrise[i] else 'N/A'
+                    sunset_time = datetime.fromisoformat(sunset[i].replace('Z', '+00:00')).strftime('%I:%M %p') if i < len(sunset) and sunset[i] else 'N/A'
+
                     forecast_list.append({
                         'day': day_name,
                         'date': dates[i],
                         'icon': fc_icon,
                         'description': fc_desc,
                         'temp_high': round(temp_max[i]),
-                        'temp_low': round(temp_min[i])
+                        'temp_low': round(temp_min[i]),
+                        'sunrise': sunrise_time,
+                        'sunset': sunset_time,
+                        'uv_index': round(uv_max[i], 1) if i < len(uv_max) and uv_max[i] else 0,
+                        'precip_prob': precip_prob[i] if i < len(precip_prob) else 0,
+                        'precip_sum': round(precip_sum[i], 2) if i < len(precip_sum) else 0,
+                        'wind_max': round(wind_max[i], 1) if i < len(wind_max) else 0,
+                        'gust_max': round(gust_max[i], 1) if i < len(gust_max) else 0
                     })
                 except (IndexError, ValueError) as e:
                     print(f"[DEBUG] Error processing forecast day {i}: {e}")
                     continue
+
+        # Today's detailed data from daily[0]
+        today_data = {}
+        if daily and len(daily.get('time', [])) > 0:
+            try:
+                sunrise_today = datetime.fromisoformat(daily['sunrise'][0].replace('Z', '+00:00')).strftime('%I:%M %p') if daily.get('sunrise') else 'N/A'
+                sunset_today = datetime.fromisoformat(daily['sunset'][0].replace('Z', '+00:00')).strftime('%I:%M %p') if daily.get('sunset') else 'N/A'
+                today_data = {
+                    'sunrise': sunrise_today,
+                    'sunset': sunset_today,
+                    'uv_index': round(daily['uv_index_max'][0], 1) if daily.get('uv_index_max') else 0,
+                    'precip_prob': daily['precipitation_probability_max'][0] if daily.get('precipitation_probability_max') else 0,
+                    'precip_sum': round(daily['precipitation_sum'][0], 2) if daily.get('precipitation_sum') else 0
+                }
+            except (IndexError, ValueError, KeyError) as e:
+                print(f"[DEBUG] Error processing today's data: {e}")
 
         result = {
             'location': location_display if location else f"{lat}, {lon}",
@@ -2574,12 +2657,21 @@ def get_weather_data(location=None, lat=None, lon=None):
             'feels_like': round(current.get('apparent_temperature', 0)),
             'humidity': current.get('relative_humidity_2m', 0),
             'wind_speed': round(current.get('wind_speed_10m', 0), 1),
+            'wind_direction': wind_direction_to_compass(current.get('wind_direction_10m')),
+            'wind_direction_degrees': current.get('wind_direction_10m', 0),
+            'wind_gusts': round(current.get('wind_gusts_10m', 0), 1),
             'pressure': round(current.get('pressure_msl', 0)),
+            'cloud_cover': current.get('cloud_cover', 0),
+            'visibility': round(current.get('visibility', 0) / 5280, 1),  # meters to miles
+            'uv_index': round(current.get('uv_index', 0), 1),
+            'is_day': current.get('is_day', 1),
             'description': weather_desc,
             'icon': weather_icon,
-            'forecast': forecast_list
+            'today': today_data,
+            'forecast': forecast_list,
+            'hourly': hourly_list
         }
-        print(f"[DEBUG] Returning weather result with {len(forecast_list)} forecast days")
+        print(f"[DEBUG] Returning weather result with {len(forecast_list)} forecast days and {len(hourly_list)} hourly entries")
         return result
     except Exception as e:
         print(f"[ERROR] Weather fetch error: {e}")

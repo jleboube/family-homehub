@@ -100,6 +100,19 @@ window.REMINDERS_CAL_START = (function(){
 			</div>
 			{% endif %}
 		</div>
+
+		<!-- Compact Weather Widget -->
+		<div class="card p-4" id="weatherWidget">
+			<div class="flex items-start justify-between mb-3">
+				<h2 class="text-lg font-semibold flex items-center gap-2">
+					<i class="fa-solid fa-cloud-sun text-blue-500"></i> Weather
+				</h2>
+				<a href="/weather" class="text-xs text-blue-600 hover:underline">View Details →</a>
+			</div>
+			<div id="weatherContent" class="text-center text-gray-500 text-sm">
+				<i class="fa-solid fa-spinner fa-spin"></i> Loading weather...
+			</div>
+		</div>
 	</div><!-- /left col -->
 
 	<div class="space-y-6">
@@ -706,6 +719,88 @@ window.REMINDERS_CAL_START = (function(){
 	document.getElementById('whoName')?.setAttribute('value', cur);
 	document.getElementById('memberStatusName')?.setAttribute('value', cur);
 	document.getElementById('memberStatusDeleteName')?.setAttribute('value', cur);
+})();
+</script>
+<script>
+// Compact Weather Widget
+(function(){
+	const weatherContent = document.getElementById('weatherContent');
+	if (!weatherContent) return;
+
+	// Weather code to icon mapping (Open-Meteo WMO codes)
+	const weatherIcons = {
+		0: 'fa-sun', // Clear
+		1: 'fa-cloud-sun', 2: 'fa-cloud-sun', 3: 'fa-cloud', // Partly cloudy
+		45: 'fa-smog', 48: 'fa-smog', // Fog
+		51: 'fa-cloud-rain', 53: 'fa-cloud-rain', 55: 'fa-cloud-rain', // Drizzle
+		56: 'fa-snowflake', 57: 'fa-snowflake', // Freezing drizzle
+		61: 'fa-cloud-showers-heavy', 63: 'fa-cloud-showers-heavy', 65: 'fa-cloud-showers-heavy', // Rain
+		66: 'fa-snowflake', 67: 'fa-snowflake', // Freezing rain
+		71: 'fa-snowflake', 73: 'fa-snowflake', 75: 'fa-snowflake', 77: 'fa-snowflake', // Snow
+		80: 'fa-cloud-showers-heavy', 81: 'fa-cloud-showers-heavy', 82: 'fa-cloud-showers-heavy', // Showers
+		85: 'fa-snowflake', 86: 'fa-snowflake', // Snow showers
+		95: 'fa-bolt', 96: 'fa-bolt', 99: 'fa-bolt' // Thunderstorm
+	};
+
+	function getWeatherIcon(code) {
+		return weatherIcons[code] || 'fa-cloud';
+	}
+
+	// Fetch weather data
+	fetch('/api/weather?zip=47725')
+		.then(r => r.json())
+		.then(data => {
+			if (data.error) {
+				weatherContent.innerHTML = `<div class="text-red-500 text-sm">${data.error}</div>`;
+				return;
+			}
+
+			const current = data.current;
+			const today = data.today;
+			const location = data.location || 'Unknown';
+
+			const icon = getWeatherIcon(current.weather_code);
+			const iconColor = current.is_day ? 'text-yellow-500' : 'text-indigo-400';
+
+			weatherContent.innerHTML = `
+				<div class="flex items-start gap-4">
+					<div class="flex-shrink-0">
+						<i class="fa-solid ${icon} ${iconColor} text-5xl"></i>
+					</div>
+					<div class="flex-1 text-left">
+						<div class="text-3xl font-bold text-gray-800 dark:text-white">${Math.round(current.temperature)}°F</div>
+						<div class="text-sm text-gray-600 dark:text-gray-300">Feels like ${Math.round(current.feels_like)}°F</div>
+						<div class="text-xs text-gray-500 mt-1">${location}</div>
+					</div>
+					<div class="text-right text-sm">
+						<div class="text-gray-600 dark:text-gray-300">
+							<i class="fa-solid fa-arrow-up text-red-500 text-xs"></i> ${Math.round(today.high)}°
+						</div>
+						<div class="text-gray-600 dark:text-gray-300">
+							<i class="fa-solid fa-arrow-down text-blue-500 text-xs"></i> ${Math.round(today.low)}°
+						</div>
+					</div>
+				</div>
+				<div class="grid grid-cols-3 gap-2 mt-3 pt-3 border-t text-xs">
+					<div class="text-center">
+						<div class="text-gray-500">Humidity</div>
+						<div class="font-semibold text-gray-800 dark:text-white">${current.humidity}%</div>
+					</div>
+					<div class="text-center">
+						<div class="text-gray-500">Wind</div>
+						<div class="font-semibold text-gray-800 dark:text-white">${Math.round(current.wind_speed)} mph ${current.wind_direction}</div>
+					</div>
+					<div class="text-center">
+						<div class="text-gray-500">UV Index</div>
+						<div class="font-semibold text-gray-800 dark:text-white">${current.uv_index}</div>
+					</div>
+				</div>
+			`;
+		})
+		.catch(err => {
+			console.error('Weather fetch error:', err);
+			weatherContent.innerHTML = '<div class="text-red-500 text-sm">Failed to load weather</div>';
+		});
 })();
 </script>
 {% endblock %}
