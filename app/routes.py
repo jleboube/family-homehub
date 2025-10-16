@@ -2575,12 +2575,14 @@ def get_weather_data(location=None, lat=None, lon=None):
                 try:
                     time_obj = datetime.fromisoformat(h_times[i].replace('Z', '+00:00'))
                     hour_display = time_obj.strftime('%I %p')  # 12-hour format
-                    h_desc, h_icon = map_weather_code(h_weather_codes[i] if i < len(h_weather_codes) else 0)
+                    h_code = h_weather_codes[i] if i < len(h_weather_codes) else 0
+                    h_desc, h_icon = map_weather_code(h_code)
 
                     hourly_list.append({
-                        'time': hour_display,
-                        'temp': round(h_temps[i]) if i < len(h_temps) else 0,
-                        'precip_prob': h_precip_prob[i] if i < len(h_precip_prob) else 0,
+                        'hour': hour_display,
+                        'temperature': round(h_temps[i]) if i < len(h_temps) else 0,
+                        'precipitation_prob': h_precip_prob[i] if i < len(h_precip_prob) else 0,
+                        'weather_code': h_code,
                         'icon': h_icon,
                         'description': h_desc,
                         'wind_speed': round(h_wind_speeds[i], 1) if i < len(h_wind_speeds) else 0,
@@ -2610,7 +2612,8 @@ def get_weather_data(location=None, lat=None, lon=None):
                 try:
                     date_obj = datetime.strptime(dates[i], '%Y-%m-%d')
                     day_name = date_obj.strftime('%a')  # Mon, Tue, etc.
-                    fc_desc, fc_icon = map_weather_code(weather_codes[i])
+                    fc_code = weather_codes[i] if i < len(weather_codes) else 0
+                    fc_desc, fc_icon = map_weather_code(fc_code)
 
                     # Parse sunrise/sunset
                     sunrise_time = datetime.fromisoformat(sunrise[i].replace('Z', '+00:00')).strftime('%I:%M %p') if i < len(sunrise) and sunrise[i] else 'N/A'
@@ -2619,17 +2622,18 @@ def get_weather_data(location=None, lat=None, lon=None):
                     forecast_list.append({
                         'day': day_name,
                         'date': dates[i],
+                        'weather_code': fc_code,
                         'icon': fc_icon,
                         'description': fc_desc,
-                        'temp_high': round(temp_max[i]),
-                        'temp_low': round(temp_min[i]),
+                        'high': round(temp_max[i]),
+                        'low': round(temp_min[i]),
                         'sunrise': sunrise_time,
                         'sunset': sunset_time,
-                        'uv_index': round(uv_max[i], 1) if i < len(uv_max) and uv_max[i] else 0,
-                        'precip_prob': precip_prob[i] if i < len(precip_prob) else 0,
-                        'precip_sum': round(precip_sum[i], 2) if i < len(precip_sum) else 0,
+                        'uv_max': round(uv_max[i], 1) if i < len(uv_max) and uv_max[i] else 0,
+                        'precipitation_prob': precip_prob[i] if i < len(precip_prob) else 0,
+                        'precipitation_sum': round(precip_sum[i], 2) if i < len(precip_sum) else 0,
                         'wind_max': round(wind_max[i], 1) if i < len(wind_max) else 0,
-                        'gust_max': round(gust_max[i], 1) if i < len(gust_max) else 0
+                        'wind_gusts_max': round(gust_max[i], 1) if i < len(gust_max) else 0
                     })
                 except (IndexError, ValueError) as e:
                     print(f"[DEBUG] Error processing forecast day {i}: {e}")
@@ -2651,23 +2655,38 @@ def get_weather_data(location=None, lat=None, lon=None):
             except (IndexError, ValueError, KeyError) as e:
                 print(f"[DEBUG] Error processing today's data: {e}")
 
+        # Add high/low from today's daily data
+        today_high = round(daily['temperature_2m_max'][0]) if daily and daily.get('temperature_2m_max') and len(daily['temperature_2m_max']) > 0 else 0
+        today_low = round(daily['temperature_2m_min'][0]) if daily and daily.get('temperature_2m_min') and len(daily['temperature_2m_min']) > 0 else 0
+
         result = {
             'location': location_display if location else f"{lat}, {lon}",
-            'temp': round(current.get('temperature_2m', 0)),
-            'feels_like': round(current.get('apparent_temperature', 0)),
-            'humidity': current.get('relative_humidity_2m', 0),
-            'wind_speed': round(current.get('wind_speed_10m', 0), 1),
-            'wind_direction': wind_direction_to_compass(current.get('wind_direction_10m')),
-            'wind_direction_degrees': current.get('wind_direction_10m', 0),
-            'wind_gusts': round(current.get('wind_gusts_10m', 0), 1),
-            'pressure': round(current.get('pressure_msl', 0)),
-            'cloud_cover': current.get('cloud_cover', 0),
-            'visibility': round(current.get('visibility', 0) / 5280, 1),  # meters to miles
-            'uv_index': round(current.get('uv_index', 0), 1),
-            'is_day': current.get('is_day', 1),
-            'description': weather_desc,
-            'icon': weather_icon,
-            'today': today_data,
+            'current': {
+                'temperature': round(current.get('temperature_2m', 0)),
+                'feels_like': round(current.get('apparent_temperature', 0)),
+                'humidity': current.get('relative_humidity_2m', 0),
+                'wind_speed': round(current.get('wind_speed_10m', 0), 1),
+                'wind_direction': wind_direction_to_compass(current.get('wind_direction_10m')),
+                'wind_direction_degrees': current.get('wind_direction_10m', 0),
+                'wind_gusts': round(current.get('wind_gusts_10m', 0), 1),
+                'pressure': round(current.get('pressure_msl', 0)),
+                'cloud_cover': current.get('cloud_cover', 0),
+                'visibility': round(current.get('visibility', 0) / 1609.34, 1),  # meters to miles
+                'uv_index': round(current.get('uv_index', 0), 1),
+                'is_day': current.get('is_day', 1),
+                'weather_code': weather_code,
+                'description': weather_desc,
+                'icon': weather_icon
+            },
+            'today': {
+                'high': today_high,
+                'low': today_low,
+                'sunrise': today_data.get('sunrise', 'N/A'),
+                'sunset': today_data.get('sunset', 'N/A'),
+                'uv_index': today_data.get('uv_index', 0),
+                'precip_prob': today_data.get('precip_prob', 0),
+                'precip_sum': today_data.get('precip_sum', 0)
+            },
             'forecast': forecast_list,
             'hourly': hourly_list
         }
