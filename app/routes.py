@@ -2738,6 +2738,20 @@ def weather_update():
         print("[DEBUG] Returning error response")
         return jsonify({'success': False, 'error': 'Could not fetch weather data'})
 
+@main_bp.route('/api/weather', methods=['GET'])
+def api_weather():
+    """API endpoint for weather data (used by widget)"""
+    location = request.args.get('zip')
+    lat = request.args.get('lat')
+    lon = request.args.get('lon')
+
+    weather_data = get_weather_data(location=location, lat=lat, lon=lon)
+
+    if weather_data:
+        return jsonify(weather_data)
+    else:
+        return jsonify({'error': 'Could not fetch weather data'}), 400
+
 # Countdown Timers
 @main_bp.route('/countdowns')
 def countdowns():
