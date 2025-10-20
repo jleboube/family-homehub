@@ -100,14 +100,22 @@ Open your browser and go to: **http://localhost:8765**
 HomeHub can surface your self-hosted Open WebUI assistant right inside the dashboard:
 
 1. Deploy Open WebUI (and Ollama) somewhere reachable by HomeHub and create an API key.  
-2. In `config.yml`, set `feature_toggles.llm_chat: true` and fill out the `llm_chat` section:
+2. In `config.yml`, enable the sidebar button and provide connection details. You can keep the settings inside `feature_toggles` **or** in the dedicated `llm_chat` block. Both examples below are equivalent—pick the style you prefer:
+
    ```yaml
+   feature_toggles:
+     llm_chat:
+       enabled: true              # show the Chat with LLM tab
+       base_url: "https://chat.example.com"
+       default_model: "codellama:7b"
+       api_key_env: "OPEN_WEBUI_API_KEY"
+
+   # ...or keep the toggle boolean and configure the details here:
    llm_chat:
-     enabled: true
      base_url: "https://chat.example.com"
+     default_model: "codellama:7b"
      api_key: ""                 # or leave blank to pull from environment
      api_key_env: "OPEN_WEBUI_API_KEY"
-     default_model: "codellama:7b"
      page_title: "Chat with LLM"
      description: "Ask questions and get answers from our self-hosted assistant."
    ```

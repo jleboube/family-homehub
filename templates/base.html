@@ -127,7 +127,7 @@
                     <i class="fas fa-house text-lg w-6"></i>
                     <span>Welcome</span>
                 </a>
-                {% if config.feature_toggles.get('llm_chat') %}<a href="/llm-chat" class="block py-3 px-4 rounded sidebar-link flex items-center gap-3">
+                {% if config.llm_chat.enabled %}<a href="/llm-chat" class="block py-3 px-4 rounded sidebar-link flex items-center gap-3">
                     <i class="fas fa-robot text-lg w-6"></i>
                     <span>{{ config.llm_chat.page_title }}</span>
                 </a>{% endif %}

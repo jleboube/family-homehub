@@ -25,6 +25,9 @@ feature_toggles:
   pet_care: true
   weather: true
   countdown_timers: true
+  llm_chat:
+    enabled: false  # set to true to display the Chat with LLM tab
+    # base_url: "https://chat.example.com"  # optional: you can configure details here instead of the llm_chat block below
 
 family_members:
   - Mom
@@ -86,7 +89,6 @@ theme:
   sidebar_active_color: "#10b981"   # Bright emerald on hover
 
 llm_chat:
-  enabled: false
   base_url: "https://chat.example.com"
   # If you prefer to keep the API key out of this file, leave api_key blank and set the OPEN_WEBUI_API_KEY environment variable.
   api_key: ""

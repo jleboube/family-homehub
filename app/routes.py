@@ -2814,12 +2814,12 @@ def _llm_settings():
     """Fetch LLM chat configuration and authenticated user."""
     from flask import g
     config = current_app.config['HOMEHUB_CONFIG']
-    if not config['feature_toggles'].get('llm_chat'):
+    llm_cfg = config.get('llm_chat') or {}
+    if not llm_cfg.get('enabled'):
         abort(404)
     user = getattr(g, 'current_user', None)
     if not user:
         abort(401)
-    llm_cfg = config.get('llm_chat') or {}
     base_url = (llm_cfg.get('base_url') or '').rstrip('/')
     if not base_url:
         abort(503, description='LLM chat base URL is not configured.')

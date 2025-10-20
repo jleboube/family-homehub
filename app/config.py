@@ -20,7 +20,7 @@ def load_config():
     config['feature_toggles'].setdefault('who_is_home', True)
     # Personal status feature toggle (new)
     config['feature_toggles'].setdefault('personal_status', True)
-    # LLM chat feature toggle (disabled by default)
+    # Ensure key exists (may be bool or dict in user config)
     config['feature_toggles'].setdefault('llm_chat', False)
     # Reminders defaults & calendar start day (supports sunday..saturday or 0-6)
     rem = config.setdefault('reminders', {})
@@ -42,13 +42,39 @@ def load_config():
     theme.setdefault('sidebar_text_color', '#ffffff')
     theme.setdefault('sidebar_link_color', 'rgba(255,255,255,0.95)')
     theme.setdefault('sidebar_link_border_color', 'rgba(255,255,255,0.18)')
-    # LLM chat integration defaults
-    llm_chat = config.setdefault('llm_chat', {})
-    llm_chat.setdefault('enabled', False)
-    llm_chat.setdefault('base_url', '')
-    llm_chat.setdefault('default_model', '')
-    llm_chat.setdefault('api_key', '')
-    llm_chat.setdefault('api_key_env', 'OPEN_WEBUI_API_KEY')
-    llm_chat.setdefault('page_title', 'Chat with LLM')
-    llm_chat.setdefault('description', 'Ask questions and chat with the family assistant.')
+    # LLM chat integration defaults with flexible configuration
+    llm_chat_cfg = config.get('llm_chat')
+    if not isinstance(llm_chat_cfg, dict):
+        llm_chat_cfg = {}
+    config['llm_chat'] = llm_chat_cfg
+
+    llm_toggle = config['feature_toggles'].get('llm_chat')
+    toggle_enabled = None
+
+    if isinstance(llm_toggle, dict):
+        toggle_enabled = llm_toggle.get('enabled')
+        for key, value in llm_toggle.items():
+            if key == 'enabled':
+                continue
+            llm_chat_cfg.setdefault(key, value)
+        config['feature_toggles']['llm_chat'] = bool(toggle_enabled) if toggle_enabled is not None else True
+        toggle_enabled = config['feature_toggles']['llm_chat']
+    elif llm_toggle is not None:
+        toggle_enabled = bool(llm_toggle)
+
+    if toggle_enabled is None and 'enabled' in llm_chat_cfg:
+        toggle_enabled = bool(llm_chat_cfg['enabled'])
+
+    if toggle_enabled is None:
+        toggle_enabled = False
+
+    llm_chat_cfg['enabled'] = bool(toggle_enabled)
+    config['feature_toggles']['llm_chat'] = llm_chat_cfg['enabled']
+
+    llm_chat_cfg.setdefault('base_url', '')
+    llm_chat_cfg.setdefault('default_model', '')
+    llm_chat_cfg.setdefault('api_key', '')
+    llm_chat_cfg.setdefault('api_key_env', 'OPEN_WEBUI_API_KEY')
+    llm_chat_cfg.setdefault('page_title', 'Chat with LLM')
+    llm_chat_cfg.setdefault('description', 'Ask questions and chat with the family assistant.')
     return config

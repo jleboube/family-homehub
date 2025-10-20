@@ -27,6 +27,7 @@ __pycache__/
 .env.local
 .env.production
 config.yml
+my-config.yml
 
 # Secret keys
 *.key
