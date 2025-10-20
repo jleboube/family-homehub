@@ -2839,6 +2839,17 @@ def _llm_settings():
     return base_url, headers, default_model, llm_cfg, user
 
 
+def _unwrap_llm_payload(data):
+    if not isinstance(data, dict):
+        return {}
+    # Newer Open WebUI responses often wrap payloads under "data" or "session" keys
+    if isinstance(data.get('data'), dict):
+        return data['data']
+    if isinstance(data.get('session'), dict):
+        return data['session']
+    return data
+
+
 def _serialize_llm_session(session_obj):
     return {
         'chat_id': session_obj.chat_id,
@@ -2851,16 +2862,27 @@ def _serialize_llm_session(session_obj):
 def _create_llm_chat(base_url, headers, user):
     """Create a new chat session via Open WebUI, persist it, and return the model."""
     try:
-        resp = requests.post(f'{base_url}/api/v1/chats/new', headers=headers, timeout=10)
+        resp = requests.post(
+            f'{base_url}/api/chat/sessions',
+            headers=headers,
+            json={},
+            timeout=10,
+        )
         resp.raise_for_status()
         data = resp.json() if resp.content else {}
     except Exception as exc:
         current_app.logger.exception('Unable to create LLM chat session: %s', exc)
         abort(502, description='Unable to create chat session with LLM service.')
-    chat_id = data.get('id') or data.get('chat_id') or data.get('chatId')
+    payload = _unwrap_llm_payload(data)
+    chat_id = (
+        payload.get('id')
+        or payload.get('session_id')
+        or payload.get('chat_id')
+        or payload.get('uuid')
+    )
     if not chat_id:
         abort(502, description='LLM service returned an unexpected response when creating chat.')
-    title = data.get('title') or 'Conversation'
+    title = payload.get('title') or payload.get('name') or 'Conversation'
     record = LLMChatSession(user_id=user.id, chat_id=chat_id, title=title)
     db.session.add(record)
     try:
@@ -2922,7 +2944,11 @@ def llm_chat_history():
         abort(404, description='Chat session not found.')
     session['llm_chat_id'] = record.chat_id
     try:
-        resp = requests.get(f'{base_url}/api/v1/chats/{chat_id}', headers=headers, timeout=10)
+        resp = requests.get(
+            f'{base_url}/api/chat/sessions/{chat_id}',
+            headers=headers,
+            timeout=10,
+        )
         if resp.status_code == 404:
             return jsonify({'chat_id': chat_id, 'messages': []})
         resp.raise_for_status()
@@ -2930,8 +2956,9 @@ def llm_chat_history():
     except Exception as exc:
         current_app.logger.exception('Unable to fetch LLM chat history: %s', exc)
         abort(502, description='Unable to fetch chat history from LLM service.')
-    messages = data.get('messages') or []
-    title = data.get('title') or record.title or 'Conversation'
+    payload = _unwrap_llm_payload(data)
+    messages = payload.get('messages') or []
+    title = payload.get('title') or payload.get('name') or record.title or 'Conversation'
     record.title = title
     record.last_used = datetime.utcnow()
     try:
@@ -2960,20 +2987,38 @@ def llm_chat_send():
     body = {
         'messages': [{'role': 'user', 'content': user_message}],
         'model': model,
+        'session_id': chat_id,
         'chat_id': chat_id,
         'chatId': chat_id,
         'stream': False,
     }
     try:
-        resp = requests.post(f'{base_url}/api/chat/completions', headers=headers, json=body, timeout=120)
+        resp = requests.post(
+            f'{base_url}/api/chat/completions',
+            headers=headers,
+            json=body,
+            timeout=120,
+        )
         resp.raise_for_status()
         data = resp.json() if resp.content else {}
     except Exception as exc:
         current_app.logger.exception('LLM chat completion failed: %s', exc)
         abort(502, description='Unable to get a response from the LLM service.')
-    choices = data.get('choices') or []
-    assistant = choices[0].get('message') if choices else {}
-    new_title = (data.get('chat') or {}).get('title') if isinstance(data.get('chat'), dict) else data.get('title')
+    assistant = None
+    choices = data.get('choices') if isinstance(data.get('choices'), list) else None
+    if choices:
+        assistant = choices[0].get('message') if choices else None
+    elif isinstance(data.get('message'), dict):
+        assistant = data['message']
+    elif isinstance(data.get('messages'), list) and data['messages']:
+        assistant = data['messages'][-1]
+
+    session_meta = data.get('session') if isinstance(data.get('session'), dict) else None
+    new_title = None
+    if session_meta:
+        new_title = session_meta.get('title') or session_meta.get('name')
+    if not new_title and isinstance(data.get('chat'), dict):
+        new_title = data['chat'].get('title') or data['chat'].get('name')
     if new_title:
         record.title = new_title
     record.last_used = datetime.utcnow()

@@ -46,17 +46,16 @@ def load_config():
     llm_chat_cfg = config.get('llm_chat')
     if not isinstance(llm_chat_cfg, dict):
         llm_chat_cfg = {}
-    config['llm_chat'] = llm_chat_cfg
 
     llm_toggle = config['feature_toggles'].get('llm_chat')
     toggle_enabled = None
 
     if isinstance(llm_toggle, dict):
-        toggle_enabled = llm_toggle.get('enabled')
+        toggle_enabled = llm_toggle.get('enabled', toggle_enabled)
         for key, value in llm_toggle.items():
             if key == 'enabled':
                 continue
-            llm_chat_cfg.setdefault(key, value)
+            llm_chat_cfg[key] = value
         config['feature_toggles']['llm_chat'] = bool(toggle_enabled) if toggle_enabled is not None else True
         toggle_enabled = config['feature_toggles']['llm_chat']
     elif llm_toggle is not None:
@@ -77,4 +76,5 @@ def load_config():
     llm_chat_cfg.setdefault('api_key_env', 'OPEN_WEBUI_API_KEY')
     llm_chat_cfg.setdefault('page_title', 'Chat with LLM')
     llm_chat_cfg.setdefault('description', 'Ask questions and chat with the family assistant.')
+    config['llm_chat'] = llm_chat_cfg
     return config
