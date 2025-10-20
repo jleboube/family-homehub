@@ -20,6 +20,8 @@ def load_config():
     config['feature_toggles'].setdefault('who_is_home', True)
     # Personal status feature toggle (new)
     config['feature_toggles'].setdefault('personal_status', True)
+    # LLM chat feature toggle (disabled by default)
+    config['feature_toggles'].setdefault('llm_chat', False)
     # Reminders defaults & calendar start day (supports sunday..saturday or 0-6)
     rem = config.setdefault('reminders', {})
     # Do not overwrite existing user value
@@ -40,4 +42,13 @@ def load_config():
     theme.setdefault('sidebar_text_color', '#ffffff')
     theme.setdefault('sidebar_link_color', 'rgba(255,255,255,0.95)')
     theme.setdefault('sidebar_link_border_color', 'rgba(255,255,255,0.18)')
+    # LLM chat integration defaults
+    llm_chat = config.setdefault('llm_chat', {})
+    llm_chat.setdefault('enabled', False)
+    llm_chat.setdefault('base_url', '')
+    llm_chat.setdefault('default_model', '')
+    llm_chat.setdefault('api_key', '')
+    llm_chat.setdefault('api_key_env', 'OPEN_WEBUI_API_KEY')
+    llm_chat.setdefault('page_title', 'Chat with LLM')
+    llm_chat.setdefault('description', 'Ask questions and chat with the family assistant.')
     return config

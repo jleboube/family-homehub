@@ -19,6 +19,7 @@ HomeHub is packed with useful tools to make family life a little more organized:
 * **🎬 Media Downloader**: Save videos or music from popular sites directly to your server.
 * **♟️ Chess Game**: Play chess against AI (5 difficulty levels), local 2-player, or **remote multiplayer** with shareable links!
 * **🎮 Arcade Games**: Add your own HTML5 games to the games directory.
+* **🤖 LLM Chat**: Embed your self-hosted Open WebUI assistant with per-user chat sessions.
 * ...and more, including a **Recipe Book**, **Expiry Tracker**, **URL Shortener**, **PDF Compressor**, and **QR Code Generator**!
 
 ## 🎯 Key Features
@@ -93,6 +94,30 @@ docker compose up -d
 **6. Access HomeHub:**
 
 Open your browser and go to: **http://localhost:8765**
+
+### 🤖 LLM Chat Integration (optional)
+
+HomeHub can surface your self-hosted Open WebUI assistant right inside the dashboard:
+
+1. Deploy Open WebUI (and Ollama) somewhere reachable by HomeHub and create an API key.  
+2. In `config.yml`, set `feature_toggles.llm_chat: true` and fill out the `llm_chat` section:
+   ```yaml
+   llm_chat:
+     enabled: true
+     base_url: "https://chat.example.com"
+     api_key: ""                 # or leave blank to pull from environment
+     api_key_env: "OPEN_WEBUI_API_KEY"
+     default_model: "codellama:7b"
+     page_title: "Chat with LLM"
+     description: "Ask questions and get answers from our self-hosted assistant."
+   ```
+3. For better security, export the API key instead of storing it in Git-tracked files:
+   ```bash
+   export OPEN_WEBUI_API_KEY="your-generated-key"
+   ```
+4. Restart HomeHub (`docker compose restart`) and a **Chat with LLM** button will appear in the sidebar for authenticated users.
+
+Every visit creates or resumes a unique Open WebUI chat that’s stored per HomeHub user—family members can hop back into previous conversations without seeing anyone else’s history, while responses continue to leverage your existing Open WebUI workflows (model selection, policies, logging, etc.).
 
 ### First Run - Setting Up Passwords
 

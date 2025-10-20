@@ -121,6 +121,8 @@ def create_app():
             cur.execute("CREATE TABLE IF NOT EXISTS pet (id INTEGER PRIMARY KEY, name VARCHAR(128) NOT NULL, species VARCHAR(64), breed VARCHAR(128), icon VARCHAR(32), birth_date DATE, creator VARCHAR(64), timestamp TIMESTAMP)")
             cur.execute("CREATE TABLE IF NOT EXISTS pet_care_event (id INTEGER PRIMARY KEY, pet_id INTEGER NOT NULL, event_type VARCHAR(64) NOT NULL, description TEXT, event_date DATE NOT NULL, next_due DATE, creator VARCHAR(64), timestamp TIMESTAMP, FOREIGN KEY(pet_id) REFERENCES pet(id))")
             cur.execute("CREATE TABLE IF NOT EXISTS countdown (id INTEGER PRIMARY KEY, event_name VARCHAR(256) NOT NULL, event_date DATE NOT NULL, icon VARCHAR(32), description TEXT, creator VARCHAR(64), timestamp TIMESTAMP)")
+            cur.execute("CREATE TABLE IF NOT EXISTS llm_chat_session (id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL, chat_id TEXT UNIQUE NOT NULL, title TEXT, created_at TIMESTAMP, last_used TIMESTAMP, FOREIGN KEY(user_id) REFERENCES user(id))")
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_llm_chat_session_user ON llm_chat_session(user_id)")
 
             conn.commit()
             conn.close()

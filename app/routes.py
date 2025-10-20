@@ -1,7 +1,7 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, send_from_directory, jsonify, current_app, session
+from flask import Blueprint, render_template, request, redirect, url_for, flash, send_from_directory, jsonify, current_app, session, abort
 from .config import load_config
 from threading import Thread
-from .models import db, Note, File, Media, PDF, ShoppingItem, GroceryHistory, HomeStatus, Chore, Recipe, ExpiryItem, ShortURL, QRCode, Notice, Reminder, MemberStatus, RecurringExpense, ExpenseEntry, BitwardenVault, User, Photo, MealPlan, FavoriteMeal, MaintenanceTask, Pet, PetCareEvent, Countdown
+from .models import db, Note, File, Media, PDF, ShoppingItem, GroceryHistory, HomeStatus, Chore, Recipe, ExpiryItem, ShortURL, QRCode, Notice, Reminder, MemberStatus, RecurringExpense, ExpenseEntry, BitwardenVault, User, Photo, MealPlan, FavoriteMeal, MaintenanceTask, Pet, PetCareEvent, Countdown, LLMChatSession
 from .utils import generate_short_code
 import os
 from werkzeug.utils import secure_filename
@@ -11,6 +11,7 @@ import bleach
 import json
 import secrets
 import time
+import requests
 
 main_bp = Blueprint('main', __name__)
 
@@ -2807,3 +2808,211 @@ def countdowns_delete(countdown_id):
     db.session.delete(countdown)
     db.session.commit()
     return jsonify({'success': True})
+
+
+def _llm_settings():
+    """Fetch LLM chat configuration and authenticated user."""
+    from flask import g
+    config = current_app.config['HOMEHUB_CONFIG']
+    if not config['feature_toggles'].get('llm_chat'):
+        abort(404)
+    user = getattr(g, 'current_user', None)
+    if not user:
+        abort(401)
+    llm_cfg = config.get('llm_chat') or {}
+    base_url = (llm_cfg.get('base_url') or '').rstrip('/')
+    if not base_url:
+        abort(503, description='LLM chat base URL is not configured.')
+    api_key = llm_cfg.get('api_key') or ''
+    api_key_env = llm_cfg.get('api_key_env') or ''
+    if not api_key and api_key_env:
+        api_key = os.getenv(api_key_env, '')
+    if not api_key:
+        api_key = os.getenv('OPEN_WEBUI_API_KEY', '')
+    if not api_key:
+        abort(503, description='LLM chat API key is not configured.')
+    default_model = llm_cfg.get('default_model') or ''
+    headers = {
+        'Authorization': f'Bearer {api_key}',
+        'Content-Type': 'application/json'
+    }
+    return base_url, headers, default_model, llm_cfg, user
+
+
+def _serialize_llm_session(session_obj):
+    return {
+        'chat_id': session_obj.chat_id,
+        'title': session_obj.title or 'Conversation',
+        'created_at': session_obj.created_at.isoformat() if session_obj.created_at else None,
+        'last_used': session_obj.last_used.isoformat() if session_obj.last_used else None
+    }
+
+
+def _create_llm_chat(base_url, headers, user):
+    """Create a new chat session via Open WebUI, persist it, and return the model."""
+    try:
+        resp = requests.post(f'{base_url}/api/v1/chats/new', headers=headers, timeout=10)
+        resp.raise_for_status()
+        data = resp.json() if resp.content else {}
+    except Exception as exc:
+        current_app.logger.exception('Unable to create LLM chat session: %s', exc)
+        abort(502, description='Unable to create chat session with LLM service.')
+    chat_id = data.get('id') or data.get('chat_id') or data.get('chatId')
+    if not chat_id:
+        abort(502, description='LLM service returned an unexpected response when creating chat.')
+    title = data.get('title') or 'Conversation'
+    record = LLMChatSession(user_id=user.id, chat_id=chat_id, title=title)
+    db.session.add(record)
+    try:
+        db.session.commit()
+    except Exception as exc:
+        db.session.rollback()
+        current_app.logger.exception('Failed to persist LLM chat session: %s', exc)
+        abort(500, description='Failed to record LLM chat session.')
+    return record
+
+
+@main_bp.route('/llm-chat')
+def llm_chat():
+    base_url, headers, default_model, llm_cfg, user = _llm_settings()
+    desired_chat = (request.args.get('chat') or session.get('llm_chat_id') or '').strip()
+    force_new = request.args.get('reset') == '1'
+
+    record = None
+    if desired_chat:
+        record = LLMChatSession.query.filter_by(user_id=user.id, chat_id=desired_chat).first()
+    if force_new or not record:
+        if not force_new:
+            record = LLMChatSession.query.filter_by(user_id=user.id).order_by(LLMChatSession.last_used.desc(), LLMChatSession.created_at.desc()).first()
+        if not record or force_new:
+            record = _create_llm_chat(base_url, headers, user)
+    session['llm_chat_id'] = record.chat_id
+    record.last_used = datetime.utcnow()
+    db.session.commit()
+
+    sessions = LLMChatSession.query.filter_by(user_id=user.id).order_by(LLMChatSession.last_used.desc(), LLMChatSession.created_at.desc()).all()
+    serialized_sessions = [_serialize_llm_session(s) for s in sessions]
+
+    page_title = llm_cfg.get('page_title') or 'Chat with LLM'
+    description = llm_cfg.get('description') or ''
+    return render_template(
+        'llm_chat.html',
+        config=current_app.config['HOMEHUB_CONFIG'],
+        is_authed=True,
+        chat_id=record.chat_id,
+        default_model=default_model,
+        chat_sessions=serialized_sessions,
+        active_chat_id=record.chat_id,
+        llm_chat_settings={
+            'page_title': page_title,
+            'description': description
+        }
+    )
+
+
+@main_bp.route('/api/llm/chat/history')
+def llm_chat_history():
+    base_url, headers, _, _, user = _llm_settings()
+    requested_chat = (request.args.get('chat_id') or '').strip()
+    chat_id = requested_chat or session.get('llm_chat_id')
+    if not chat_id:
+        abort(400, description='No active chat session.')
+    record = LLMChatSession.query.filter_by(user_id=user.id, chat_id=chat_id).first()
+    if not record:
+        abort(404, description='Chat session not found.')
+    session['llm_chat_id'] = record.chat_id
+    try:
+        resp = requests.get(f'{base_url}/api/v1/chats/{chat_id}', headers=headers, timeout=10)
+        if resp.status_code == 404:
+            return jsonify({'chat_id': chat_id, 'messages': []})
+        resp.raise_for_status()
+        data = resp.json() if resp.content else {}
+    except Exception as exc:
+        current_app.logger.exception('Unable to fetch LLM chat history: %s', exc)
+        abort(502, description='Unable to fetch chat history from LLM service.')
+    messages = data.get('messages') or []
+    title = data.get('title') or record.title or 'Conversation'
+    record.title = title
+    record.last_used = datetime.utcnow()
+    try:
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+    return jsonify({'chat_id': chat_id, 'messages': messages, 'title': title})
+
+
+@main_bp.route('/api/llm/chat/send', methods=['POST'])
+def llm_chat_send():
+    base_url, headers, default_model, _, user = _llm_settings()
+    chat_id = session.get('llm_chat_id')
+    if not chat_id:
+        abort(400, description='No active chat session.')
+    record = LLMChatSession.query.filter_by(user_id=user.id, chat_id=chat_id).first()
+    if not record:
+        abort(404, description='Chat session not found.')
+    payload = request.get_json(silent=True) or {}
+    user_message = (payload.get('message') or '').strip()
+    model = (payload.get('model') or '').strip() or default_model
+    if not user_message:
+        abort(400, description='Message is required.')
+    if not model:
+        abort(400, description='No default model configured for LLM chat.')
+    body = {
+        'messages': [{'role': 'user', 'content': user_message}],
+        'model': model,
+        'chat_id': chat_id,
+        'chatId': chat_id,
+        'stream': False,
+    }
+    try:
+        resp = requests.post(f'{base_url}/api/chat/completions', headers=headers, json=body, timeout=120)
+        resp.raise_for_status()
+        data = resp.json() if resp.content else {}
+    except Exception as exc:
+        current_app.logger.exception('LLM chat completion failed: %s', exc)
+        abort(502, description='Unable to get a response from the LLM service.')
+    choices = data.get('choices') or []
+    assistant = choices[0].get('message') if choices else {}
+    new_title = (data.get('chat') or {}).get('title') if isinstance(data.get('chat'), dict) else data.get('title')
+    if new_title:
+        record.title = new_title
+    record.last_used = datetime.utcnow()
+    try:
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+    return jsonify({'chat_id': chat_id, 'assistant': assistant, 'raw': data, 'title': record.title or new_title})
+
+
+@main_bp.route('/api/llm/chat/reset', methods=['POST'])
+def llm_chat_reset():
+    base_url, headers, _, _, user = _llm_settings()
+    record = _create_llm_chat(base_url, headers, user)
+    session['llm_chat_id'] = record.chat_id
+    return jsonify({'chat_id': record.chat_id, 'session': _serialize_llm_session(record)})
+
+
+@main_bp.route('/api/llm/chat/sessions')
+def llm_chat_sessions():
+    _, _, _, _, user = _llm_settings()
+    sessions = LLMChatSession.query.filter_by(user_id=user.id).order_by(LLMChatSession.last_used.desc(), LLMChatSession.created_at.desc()).all()
+    return jsonify({'sessions': [_serialize_llm_session(s) for s in sessions], 'active_chat_id': session.get('llm_chat_id')})
+
+
+@main_bp.route('/api/llm/chat/select', methods=['POST'])
+def llm_chat_select():
+    _, _, _, _, user = _llm_settings()
+    payload = request.get_json(silent=True) or {}
+    chat_id = (payload.get('chat_id') or '').strip()
+    if not chat_id:
+        abort(400, description='chat_id is required.')
+    record = LLMChatSession.query.filter_by(user_id=user.id, chat_id=chat_id).first()
+    if not record:
+        abort(404, description='Chat session not found.')
+    session['llm_chat_id'] = record.chat_id
+    record.last_used = datetime.utcnow()
+    try:
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+    return jsonify({'chat_id': record.chat_id, 'session': _serialize_llm_session(record)})

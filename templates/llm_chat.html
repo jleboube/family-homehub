@@ -1,0 +1,362 @@
+{% extends "base.html" %}
+{% block extra_head %}
+<style>
+.chat-bubble{
+    max-width: 85%;
+    padding: 0.75rem 1rem;
+    border-radius: 1rem;
+    margin-bottom: 0.75rem;
+    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+.chat-bubble.user{background: var(--primary-color); color:#fff; margin-left:auto; border-bottom-right-radius:0.3rem;}
+.chat-bubble.assistant{background:#f1f5f9; color:#0f172a; margin-right:auto; border-bottom-left-radius:0.3rem;}
+.chat-log{max-height:60vh; overflow-y:auto; padding-right:0.25rem;}
+.chat-log::-webkit-scrollbar{width:8px;}
+.chat-log::-webkit-scrollbar-thumb{background:rgba(148,163,184,0.6); border-radius:4px;}
+#llmMessage{resize:none;}
+</style>
+{% endblock %}
+{% block content %}
+<div class="flex flex-col md:flex-row gap-6">
+    <aside class="md:w-72 flex-shrink-0 space-y-4">
+        <div class="card p-4 space-y-3">
+            <div class="flex items-center justify-between">
+                <h2 class="text-lg font-semibold flex items-center gap-2">
+                    <i class="fa-solid fa-comments text-emerald-500"></i>
+                    Conversations
+                </h2>
+                <button id="llmNewChatBtn" type="button" class="inline-flex items-center gap-1 px-3 py-1.5 text-sm rounded-full bg-emerald-500 text-white hover:bg-emerald-600 transition">
+                    <i class="fa-solid fa-plus"></i>
+                    New
+                </button>
+            </div>
+            <div id="llmSessionList" class="space-y-2"></div>
+            <div id="llmSessionsEmpty" class="text-sm text-slate-500 {{ 'hidden' if chat_sessions else '' }}">
+                No past chats yet. Start a new conversation to see it here.
+            </div>
+        </div>
+    </aside>
+    <div class="flex-1">
+        <div class="card p-6 space-y-6">
+            <div class="flex items-start gap-4">
+                <div class="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500 text-white text-2xl">
+                    <i class="fa-solid fa-robot"></i>
+                </div>
+                <div class="flex-1">
+                    <h1 class="text-2xl font-bold mb-1">{{ llm_chat_settings.page_title }}</h1>
+                    {% if llm_chat_settings.description %}
+                    <p class="text-gray-600 mb-2">{{ llm_chat_settings.description }}</p>
+                    {% endif %}
+                    <div class="flex flex-wrap items-center gap-2 text-sm text-gray-500">
+                        <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            <i class="fa-solid fa-shield-check"></i>
+                            Private family session
+                        </span>
+                        {% if default_model %}
+                        <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-slate-100 text-slate-700 border border-slate-200" id="llmDefaultModel">
+                            <i class="fa-solid fa-microchip"></i>
+                            Model: {{ default_model }}
+                        </span>
+                        {% endif %}
+                        <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-white border border-slate-200 text-slate-600" id="llmSessionTitleWrap">
+                            <i class="fa-solid fa-message"></i>
+                            <span id="llmSessionTitle">Conversation</span>
+                        </span>
+                    </div>
+                </div>
+            </div>
+            <div id="llmChatLog" class="chat-log border border-slate-200 rounded-xl p-4 bg-white/60">
+                <div class="text-center text-sm text-slate-500" id="llmEmptyState">
+                    Ask your first question to begin. The assistant will respond here.
+                </div>
+            </div>
+            <form id="llmChatForm" class="space-y-3">
+                <label for="llmMessage" class="block text-sm font-semibold text-slate-600">Your message</label>
+                <div class="relative">
+                    <textarea id="llmMessage" name="message" rows="3" class="w-full border border-slate-300 rounded-xl p-3 pr-12 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400" placeholder="Type a question for the family assistant..." required></textarea>
+                    <button type="submit" id="llmSendBtn" class="absolute bottom-2 right-2 px-3 py-2 rounded-lg bg-emerald-500 text-white hover:bg-emerald-600 transition inline-flex items-center gap-1">
+                        <i class="fa-solid fa-paper-plane"></i>
+                        Send
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<script>
+(function(){
+    const state = {
+        chatId: {{ chat_id | tojson }},
+        model: {{ default_model | tojson }},
+        loading: false,
+        sessions: new Map(),
+        currentTitle: 'Conversation'
+    };
+    const initialSessions = {{ chat_sessions | tojson }};
+    const activeChatId = {{ active_chat_id | tojson }};
+    initialSessions.forEach(s => {
+        if(!s.title){ s.title = 'Conversation'; }
+        state.sessions.set(s.chat_id, s);
+    });
+    if(activeChatId){ state.chatId = activeChatId; }
+
+    const logEl = document.getElementById('llmChatLog');
+    const emptyEl = document.getElementById('llmEmptyState');
+    const formEl = document.getElementById('llmChatForm');
+    const messageEl = document.getElementById('llmMessage');
+    const sendBtn = document.getElementById('llmSendBtn');
+    const newChatBtn = document.getElementById('llmNewChatBtn');
+    const sessionsWrap = document.getElementById('llmSessionList');
+    const sessionsEmpty = document.getElementById('llmSessionsEmpty');
+    const titleEl = document.getElementById('llmSessionTitle');
+
+    function toggleLoading(isLoading){
+        state.loading = isLoading;
+        sendBtn.disabled = isLoading;
+        sendBtn.innerHTML = isLoading
+            ? '<i class="fa-solid fa-spinner fa-spin"></i> Working...'
+            : '<i class="fa-solid fa-paper-plane"></i> Send';
+    }
+
+    function formatRelative(timestamp){
+        if(!timestamp){ return ''; }
+        const date = new Date(timestamp);
+        if(Number.isNaN(date.getTime())){ return ''; }
+        const diff = date.getTime() - Date.now();
+        let rtf;
+        if (typeof Intl !== 'undefined' && Intl.RelativeTimeFormat) {
+            rtf = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' });
+        }
+        const absMs = Math.abs(diff);
+        const minute = 60 * 1000;
+        const hour = 60 * minute;
+        const day = 24 * hour;
+        if(absMs < hour){
+            return rtf ? rtf.format(Math.round(diff / minute), 'minute') : `${Math.round(absMs / minute)} min ago`;
+        } else if(absMs < day){
+            return rtf ? rtf.format(Math.round(diff / hour), 'hour') : `${Math.round(absMs / hour)} hr ago`;
+        }
+        return rtf ? rtf.format(Math.round(diff / day), 'day') : `${Math.round(absMs / day)} day${absMs / day >= 2 ? 's' : ''} ago`;
+    }
+
+    function renderSessions(){
+        if(!sessionsWrap) return;
+        sessionsWrap.innerHTML = '';
+        const sessions = Array.from(state.sessions.values()).sort((a, b) => {
+            const aTime = new Date(a.last_used || a.created_at || 0).getTime();
+            const bTime = new Date(b.last_used || b.created_at || 0).getTime();
+            return bTime - aTime;
+        });
+        if(!sessions.length){
+            sessionsEmpty?.classList.remove('hidden');
+            return;
+        }
+        sessionsEmpty?.classList.add('hidden');
+        sessions.forEach(sess => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.dataset.chatId = sess.chat_id;
+            const isActive = sess.chat_id === state.chatId;
+            btn.className = 'w-full text-left px-3 py-2 rounded-lg border transition ' +
+                (isActive ? 'bg-emerald-500 text-white border-emerald-500 shadow-lg' : 'bg-white border-slate-200 hover:border-emerald-300 hover:bg-emerald-50');
+            const title = sess.title || 'Conversation';
+            const meta = formatRelative(sess.last_used || sess.created_at);
+            btn.innerHTML = `
+                <div class="flex items-start justify-between gap-2">
+                    <span class="font-semibold truncate">${title}</span>
+                    ${isActive ? '<i class="fa-solid fa-circle text-xs text-white mt-1"></i>' : ''}
+                </div>
+                <div class="text-xs ${isActive ? 'text-emerald-100' : 'text-slate-500'}">${meta ? 'Updated ' + meta : 'Created just now'}</div>
+            `;
+            btn.addEventListener('click', () => selectChat(sess.chat_id));
+            sessionsWrap.appendChild(btn);
+        });
+    }
+
+    function setSessionTitle(title){
+        state.currentTitle = title || 'Conversation';
+        if(titleEl){
+            titleEl.textContent = state.currentTitle;
+        }
+    }
+
+    function appendMessage(role, content){
+        if(!content){ return; }
+        if(emptyEl){ emptyEl.remove(); }
+        const wrap = document.createElement('div');
+        wrap.className = 'chat-bubble ' + (role === 'user' ? 'user' : 'assistant');
+        wrap.textContent = content;
+        logEl.appendChild(wrap);
+        logEl.scrollTo({ top: logEl.scrollHeight, behavior: 'smooth' });
+    }
+
+    function loadHistory(){
+        fetch('/api/llm/chat/history')
+            .then(resp => {
+                if(!resp.ok){ throw new Error('Failed to load history'); }
+                return resp.json();
+            })
+            .then(data => {
+                state.chatId = data.chat_id || state.chatId;
+                const messages = Array.isArray(data.messages) ? data.messages : [];
+                if(messages.length){
+                    if(emptyEl){ emptyEl.remove(); }
+                    messages.forEach(msg => appendMessage(msg.role || 'assistant', msg.content || ''));
+                } else if(emptyEl && !logEl.contains(emptyEl)){
+                    emptyEl.classList.remove('hidden');
+                    emptyEl.textContent = 'Ask your first question to begin. The assistant will respond here.';
+                    logEl.appendChild(emptyEl);
+                }
+                const session = state.sessions.get(state.chatId) || { chat_id: state.chatId };
+                if(data.title){
+                    session.title = data.title;
+                    setSessionTitle(data.title);
+                } else if(session.title){
+                    setSessionTitle(session.title);
+                } else {
+                    setSessionTitle('Conversation');
+                }
+                session.last_used = new Date().toISOString();
+                state.sessions.set(session.chat_id, session);
+                renderSessions();
+            })
+            .catch(err => {
+                console.error(err);
+                if(window.globalToast){ globalToast('Unable to load previous chat messages.', 'error'); }
+            });
+    }
+
+    function sendMessage(text){
+        toggleLoading(true);
+        appendMessage('user', text);
+        messageEl.value = '';
+        fetch('/api/llm/chat/send', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: text, model: state.model })
+        })
+        .then(resp => {
+            if(!resp.ok){ return resp.json().then(err => { throw new Error(err.description || 'Chat failed'); }); }
+            return resp.json();
+        })
+        .then(data => {
+            const assistant = data.assistant && (data.assistant.content || '');
+            if(assistant){
+                appendMessage('assistant', assistant);
+            } else if(window.globalToast){
+                globalToast('LLM responded without a message.', 'info');
+            }
+            const session = state.sessions.get(state.chatId) || { chat_id: state.chatId };
+            if(data.title){
+                session.title = data.title;
+                setSessionTitle(data.title);
+            }
+            session.last_used = new Date().toISOString();
+            state.sessions.set(session.chat_id, session);
+            renderSessions();
+        })
+        .catch(err => {
+            console.error(err);
+            if(window.globalToast){ globalToast(err.message || 'Chat request failed.', 'error'); }
+        })
+        .finally(() => {
+            toggleLoading(false);
+            messageEl.focus();
+        });
+    }
+
+    function selectChat(chatId){
+        if(state.loading || !chatId || chatId === state.chatId){ return; }
+        toggleLoading(true);
+        fetch('/api/llm/chat/select', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ chat_id: chatId })
+        })
+        .then(resp => {
+            if(!resp.ok){ return resp.json().then(err => { throw new Error(err.description || 'Unable to switch chat'); }); }
+            return resp.json();
+        })
+        .then(data => {
+            state.chatId = data.chat_id;
+            if(data.session){
+                state.sessions.set(data.session.chat_id, data.session);
+                setSessionTitle(data.session.title);
+            }
+            renderSessions();
+            logEl.innerHTML = '';
+            if(emptyEl){
+                emptyEl.classList.remove('hidden');
+                emptyEl.textContent = 'Loading conversation...';
+                logEl.appendChild(emptyEl);
+            }
+            loadHistory();
+        })
+        .catch(err => {
+            console.error(err);
+            if(window.globalToast){ globalToast(err.message || 'Could not load conversation.', 'error'); }
+        })
+        .finally(() => toggleLoading(false));
+    }
+
+    formEl.addEventListener('submit', function(ev){
+        ev.preventDefault();
+        if(state.loading){ return; }
+        const text = messageEl.value.trim();
+        if(!text){ return; }
+        sendMessage(text);
+    });
+
+    newChatBtn.addEventListener('click', function(){
+        if(state.loading){ return; }
+        toggleLoading(true);
+        fetch('/api/llm/chat/reset', { method: 'POST' })
+            .then(resp => {
+                if(!resp.ok){ throw new Error('Unable to start new chat'); }
+                return resp.json();
+            })
+            .then(data => {
+                state.chatId = data.chat_id;
+                if(data.session){
+                    state.sessions.set(data.session.chat_id, data.session);
+                    setSessionTitle(data.session.title);
+                } else {
+                    setSessionTitle('Conversation');
+                }
+                renderSessions();
+                logEl.innerHTML = '';
+                if(emptyEl){
+                    emptyEl.classList.remove('hidden');
+                    emptyEl.textContent = 'Ask your first question to begin. The assistant will respond here.';
+                    logEl.appendChild(emptyEl);
+                }
+                logEl.scrollTop = 0;
+                messageEl.focus();
+                if(window.globalToast){ globalToast('Started a new chat session.', 'success'); }
+            })
+            .catch(err => {
+                console.error(err);
+                if(window.globalToast){ globalToast(err.message || 'Could not reset chat.', 'error'); }
+            })
+            .finally(() => toggleLoading(false));
+    });
+
+    // CTRL+Enter sends message
+    messageEl.addEventListener('keydown', function(ev){
+        if((ev.ctrlKey || ev.metaKey) && ev.key === 'Enter'){
+            ev.preventDefault();
+            formEl.requestSubmit();
+        }
+    });
+
+    renderSessions();
+    const activeSession = state.sessions.get(state.chatId);
+    if(activeSession){
+        setSessionTitle(activeSession.title);
+    }
+    loadHistory();
+})();
+</script>
+{% endblock %}
