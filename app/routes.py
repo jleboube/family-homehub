@@ -4,6 +4,7 @@ from threading import Thread
 from .models import db, Note, File, Media, PDF, ShoppingItem, GroceryHistory, HomeStatus, Chore, Recipe, ExpiryItem, ShortURL, QRCode, Notice, Reminder, MemberStatus, RecurringExpense, ExpenseEntry, BitwardenVault, User, Photo, MealPlan, FavoriteMeal, MaintenanceTask, Pet, PetCareEvent, Countdown, LLMChatSession
 from .utils import generate_short_code
 import os
+import uuid
 from werkzeug.utils import secure_filename
 from datetime import datetime, date, timedelta
 import calendar as _calendar
@@ -2810,28 +2811,62 @@ def countdowns_delete(countdown_id):
     return jsonify({'success': True})
 
 
-def _llm_settings():
-    """Fetch LLM chat configuration and authenticated user."""
-    from flask import g
-    config = current_app.config['HOMEHUB_CONFIG']
-    llm_cfg = config.get('llm_chat') or {}
-    integration_mode = (llm_cfg.get('integration') or 'api').lower()
-    if integration_mode != 'api':
-        abort(404, description='LLM chat API endpoints are disabled for the current integration mode.')
-    if not llm_cfg.get('enabled'):
-        abort(404)
-    user = getattr(g, 'current_user', None)
-    if not user:
-        abort(401)
-    base_url = (llm_cfg.get('base_url') or '').rstrip('/')
-    if not base_url:
-        abort(503, description='LLM chat base URL is not configured.')
+def _resolve_llm_api_key(llm_cfg):
     api_key = llm_cfg.get('api_key') or ''
     api_key_env = llm_cfg.get('api_key_env') or ''
     if not api_key and api_key_env:
         api_key = os.getenv(api_key_env, '')
     if not api_key:
         api_key = os.getenv('OPEN_WEBUI_API_KEY', '')
+    return api_key
+
+
+def _resolve_llm_configuration():
+    """Return the current config, resolved LLM settings, and the API key."""
+    config = current_app.config['HOMEHUB_CONFIG']
+    raw_cfg = config.get('llm_chat') or {}
+    llm_cfg = dict(raw_cfg)
+    api_key = _resolve_llm_api_key(llm_cfg)
+    integration = (llm_cfg.get('integration') or '').lower()
+    allowed_integrations = {'api', 'iframe', 'widget'}
+    if integration not in allowed_integrations:
+        integration = 'api'
+    embed_url = llm_cfg.get('embed_url') or ''
+    widget_script = llm_cfg.get('widget_script') or ''
+    theme = llm_cfg.get('theme') or 'dark'
+    supports_remote_sessions = bool(llm_cfg.get('supports_remote_sessions', True))
+    if integration == 'api':
+        if widget_script and 'widget.js' in widget_script:
+            integration = 'widget'
+        elif embed_url and '/embed/' in embed_url:
+            integration = 'iframe'
+        elif api_key and api_key.startswith('cc_'):
+            integration = 'iframe'
+    llm_cfg.update({
+        'integration': integration,
+        'embed_url': embed_url,
+        'widget_script': widget_script,
+        'theme': theme,
+        'supports_remote_sessions': supports_remote_sessions
+    })
+    config['llm_chat'] = llm_cfg
+    return config, llm_cfg, api_key
+
+
+def _llm_settings():
+    """Fetch LLM chat configuration and authenticated user."""
+    from flask import g
+    config, llm_cfg, api_key = _resolve_llm_configuration()
+    if not llm_cfg.get('enabled'):
+        abort(404)
+    if llm_cfg['integration'] != 'api':
+        abort(404, description='LLM chat API endpoints are disabled for the current integration mode.')
+    user = getattr(g, 'current_user', None)
+    if not user:
+        abort(401)
+    base_url = (llm_cfg.get('base_url') or '').rstrip('/')
+    if not base_url:
+        abort(503, description='LLM chat base URL is not configured.')
     if not api_key:
         abort(503, description='LLM chat API key is not configured.')
     default_model = llm_cfg.get('default_model') or ''
@@ -2875,6 +2910,16 @@ def _create_llm_chat(base_url, headers, user):
         resp.raise_for_status()
         data = resp.json() if resp.content else {}
     except Exception as exc:
+        if isinstance(exc, requests.exceptions.HTTPError) and exc.response is not None and exc.response.status_code == 404:
+            current_app.logger.info('LLM service does not support remote session creation; falling back to local sessions.')
+            current_app.config['HOMEHUB_CONFIG']['llm_chat']['supports_remote_sessions'] = False
+            chat_id = uuid.uuid4().hex
+            record = LLMChatSession(user_id=user.id, chat_id=chat_id, title='Conversation')
+            db.session.add(record)
+            db.session.commit()
+            session.setdefault('llm_chat_logs', {})[chat_id] = []
+            session.modified = True
+            return record
         current_app.logger.exception('Unable to create LLM chat session: %s', exc)
         abort(502, description='Unable to create chat session with LLM service.')
     payload = _unwrap_llm_payload(data)
@@ -2901,31 +2946,31 @@ def _create_llm_chat(base_url, headers, user):
 @main_bp.route('/llm-chat')
 def llm_chat():
     from flask import g
-    config = current_app.config['HOMEHUB_CONFIG']
-    llm_cfg = config.get('llm_chat') or {}
+    config, llm_cfg, api_key = _resolve_llm_configuration()
     if not llm_cfg.get('enabled'):
         abort(404)
     user = getattr(g, 'current_user', None)
     if not user:
         abort(401)
 
-    integration = (llm_cfg.get('integration') or 'api').lower()
+    integration = llm_cfg.get('integration') or 'api'
     page_title = llm_cfg.get('page_title') or 'Chat with LLM'
     description = llm_cfg.get('description') or ''
 
     if integration in ('iframe', 'widget'):
-        api_key = llm_cfg.get('api_key') or ''
-        api_key_env = llm_cfg.get('api_key_env') or ''
-        if not api_key and api_key_env:
-            api_key = os.getenv(api_key_env, '')
-        if not api_key:
-            abort(503, description='LLM chat API key is not configured.')
         base_url = (llm_cfg.get('base_url') or 'https://chat.my-house.dev').rstrip('/')
         theme = llm_cfg.get('theme') or 'dark'
-        embed_url = llm_cfg.get('embed_url')
-        if not embed_url:
-            embed_url = f'{base_url}/embed/chat?userKey={api_key}&theme={theme}'
-        widget_script = llm_cfg.get('widget_script') or f'{base_url}/widget.js'
+        embed_url = llm_cfg.get('embed_url') or ''
+        widget_script = llm_cfg.get('widget_script') or ''
+        if integration == 'iframe':
+            if not embed_url:
+                if not api_key:
+                    abort(503, description='LLM chat API key is not configured for iframe embedding.')
+                embed_url = f'{base_url}/embed/chat?userKey={api_key}&theme={theme}'
+        elif integration == 'widget':
+            widget_script = widget_script or f'{base_url}/widget.js'
+            if not api_key:
+                abort(503, description='LLM chat API key is not configured for widget embedding.')
         return render_template(
             'llm_chat.html',
             config=config,
@@ -2956,6 +3001,8 @@ def llm_chat():
     session['llm_chat_id'] = record.chat_id
     record.last_used = datetime.utcnow()
     db.session.commit()
+    session.setdefault('llm_chat_logs', {}).setdefault(record.chat_id, [])
+    session.modified = True
 
     sessions = LLMChatSession.query.filter_by(user_id=user.id).order_by(LLMChatSession.last_used.desc(), LLMChatSession.created_at.desc()).all()
     serialized_sessions = [_serialize_llm_session(s) for s in sessions]
@@ -2980,7 +3027,7 @@ def llm_chat():
 
 @main_bp.route('/api/llm/chat/history')
 def llm_chat_history():
-    base_url, headers, _, _, user = _llm_settings()
+    base_url, headers, _, llm_cfg, user = _llm_settings()
     requested_chat = (request.args.get('chat_id') or '').strip()
     chat_id = requested_chat or session.get('llm_chat_id')
     if not chat_id:
@@ -2989,6 +3036,11 @@ def llm_chat_history():
     if not record:
         abort(404, description='Chat session not found.')
     session['llm_chat_id'] = record.chat_id
+    logs = session.setdefault('llm_chat_logs', {})
+    local_messages = logs.get(chat_id, [])
+    supports_remote = llm_cfg.get('supports_remote_sessions', True)
+    if not supports_remote:
+        return jsonify({'chat_id': chat_id, 'messages': local_messages, 'title': record.title or 'Conversation'})
     try:
         resp = requests.get(
             f'{base_url}/api/v1/chats/{chat_id}',
@@ -2996,12 +3048,17 @@ def llm_chat_history():
             timeout=10,
         )
         if resp.status_code == 404:
-            return jsonify({'chat_id': chat_id, 'messages': []})
+            current_app.config['HOMEHUB_CONFIG']['llm_chat']['supports_remote_sessions'] = False
+            return jsonify({'chat_id': chat_id, 'messages': local_messages, 'title': record.title or 'Conversation'})
         resp.raise_for_status()
         data = resp.json() if resp.content else {}
+        payload = _unwrap_llm_payload(data)
+        messages = payload.get('messages') or []
+        logs[chat_id] = messages
+        session.modified = True
     except Exception as exc:
         current_app.logger.exception('Unable to fetch LLM chat history: %s', exc)
-        abort(502, description='Unable to fetch chat history from LLM service.')
+        return jsonify({'chat_id': chat_id, 'messages': local_messages, 'title': record.title or 'Conversation'})
     payload = _unwrap_llm_payload(data)
     messages = payload.get('messages') or []
     title = payload.get('title') or payload.get('name') or record.title or 'Conversation'
@@ -3030,25 +3087,43 @@ def llm_chat_send():
         abort(400, description='Message is required.')
     if not model:
         abort(400, description='No default model configured for LLM chat.')
+    logs = session.setdefault('llm_chat_logs', {})
+    chat_log = logs.setdefault(chat_id, [])
     body = {
-        'messages': [{'role': 'user', 'content': user_message}],
+        'messages': chat_log + [{'role': 'user', 'content': user_message}],
         'model': model,
         'session_id': chat_id,
         'chat_id': chat_id,
         'chatId': chat_id,
         'stream': False,
     }
-    try:
-        resp = requests.post(
-            f'{base_url}/api/chat/completions',
+    chat_log.append({'role': 'user', 'content': user_message})
+    session.modified = True
+    def _post_completion(url):
+        return requests.post(
+            url,
             headers=headers,
             json=body,
             timeout=120,
         )
-        resp.raise_for_status()
+    try:
+        resp = _post_completion(f'{base_url}/api/v1/chat/completions')
+        try:
+            resp.raise_for_status()
+        except requests.exceptions.HTTPError as exc:
+            if exc.response is not None and exc.response.status_code == 404:
+                resp = _post_completion(f'{base_url}/api/chat/completions')
+                resp.raise_for_status()
+            else:
+                raise
         data = resp.json() if resp.content else {}
     except Exception as exc:
         current_app.logger.exception('LLM chat completion failed: %s', exc)
+        if isinstance(exc, requests.exceptions.HTTPError) and exc.response is not None and exc.response.status_code == 404:
+            current_app.config['HOMEHUB_CONFIG']['llm_chat']['supports_remote_sessions'] = False
+        if chat_log and chat_log[-1].get('role') == 'user':
+            chat_log.pop()
+            session.modified = True
         abort(502, description='Unable to get a response from the LLM service.')
     assistant = None
     choices = data.get('choices') if isinstance(data.get('choices'), list) else None
@@ -3068,6 +3143,13 @@ def llm_chat_send():
     if new_title:
         record.title = new_title
     record.last_used = datetime.utcnow()
+    if isinstance(assistant, dict) and 'role' in assistant and 'content' in assistant:
+        chat_log.append({'role': assistant.get('role', 'assistant'), 'content': assistant.get('content', '')})
+    elif isinstance(assistant, dict) and assistant.get('content'):
+        chat_log.append({'role': 'assistant', 'content': assistant['content']})
+    elif isinstance(assistant, str):
+        chat_log.append({'role': 'assistant', 'content': assistant})
+    session.modified = True
     try:
         db.session.commit()
     except Exception:
@@ -3080,6 +3162,8 @@ def llm_chat_reset():
     base_url, headers, _, _, user = _llm_settings()
     record = _create_llm_chat(base_url, headers, user)
     session['llm_chat_id'] = record.chat_id
+    session.setdefault('llm_chat_logs', {})[record.chat_id] = []
+    session.modified = True
     return jsonify({'chat_id': record.chat_id, 'session': _serialize_llm_session(record)})
 
 

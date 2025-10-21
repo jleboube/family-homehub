@@ -70,11 +70,16 @@ def load_config():
     llm_chat_cfg['enabled'] = bool(toggle_enabled)
     config['feature_toggles']['llm_chat'] = llm_chat_cfg['enabled']
 
+    llm_chat_cfg.setdefault('integration', 'api')
     llm_chat_cfg.setdefault('base_url', '')
     llm_chat_cfg.setdefault('default_model', '')
     llm_chat_cfg.setdefault('api_key', '')
     llm_chat_cfg.setdefault('api_key_env', 'OPEN_WEBUI_API_KEY')
     llm_chat_cfg.setdefault('page_title', 'Chat with LLM')
     llm_chat_cfg.setdefault('description', 'Ask questions and chat with the family assistant.')
+    llm_chat_cfg.setdefault('theme', 'dark')
+    llm_chat_cfg.setdefault('embed_url', '')
+    llm_chat_cfg.setdefault('widget_script', '')
+    llm_chat_cfg.setdefault('supports_remote_sessions', True)
     config['llm_chat'] = llm_chat_cfg
     return config
