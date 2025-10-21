@@ -89,10 +89,16 @@ theme:
   sidebar_active_color: "#10b981"   # Bright emerald on hover
 
 llm_chat:
+  # integration can be "api" (Open WebUI compatible), "iframe", or "widget"
+  integration: "api"
   base_url: "https://chat.example.com"
-  # If you prefer to keep the API key out of this file, leave api_key blank and set the OPEN_WEBUI_API_KEY environment variable.
+  # Leave api_key blank to read from the environment variable defined in api_key_env.
   api_key: ""
   api_key_env: "OPEN_WEBUI_API_KEY"
   default_model: "codellama:7b"
   page_title: "Chat with LLM"
   description: "Ask questions and get answers from our self-hosted assistant."
+  # iframe/widget specific overrides
+  theme: "dark"
+  embed_url: ""
+  widget_script: ""

@@ -97,35 +97,32 @@ Open your browser and go to: **http://localhost:8765**
 
 ### 🤖 LLM Chat Integration (optional)
 
-HomeHub can surface your self-hosted Open WebUI assistant right inside the dashboard:
+HomeHub can surface your assistant right inside the dashboard in two ways:
 
-1. Deploy Open WebUI (and Ollama) somewhere reachable by HomeHub and create an API key.  
-2. In `config.yml`, enable the sidebar button and provide connection details. You can keep the settings inside `feature_toggles` **or** in the dedicated `llm_chat` block. Both examples below are equivalent—pick the style you prefer:
+1. **Pick an integration mode.** Set `llm_chat.integration` to `api`, `iframe`, or `widget`.  
+   - `api` talks directly to an Open WebUI-compatible backend (existing behaviour).  
+   - `iframe` or `widget` embeds a hosted chat UI that handles auth for you.
+2. Enable the sidebar button via `feature_toggles.llm_chat.enabled: true`, then add the matching settings in the `llm_chat` block. For example, to embed a hosted chat widget:
 
    ```yaml
-   feature_toggles:
-     llm_chat:
-       enabled: true              # show the Chat with LLM tab
-       base_url: "https://chat.example.com"
-       default_model: "codellama:7b"
-       api_key_env: "OPEN_WEBUI_API_KEY"
-
-   # ...or keep the toggle boolean and configure the details here:
    llm_chat:
-     base_url: "https://chat.example.com"
-     default_model: "codellama:7b"
-     api_key: ""                 # or leave blank to pull from environment
+     integration: "iframe"
+     base_url: "https://chat.my-house.dev"
+     api_key: "your_embed_key"   # or leave blank and set api_key_env
      api_key_env: "OPEN_WEBUI_API_KEY"
+     theme: "dark"
      page_title: "Chat with LLM"
-     description: "Ask questions and get answers from our self-hosted assistant."
+     description: "Ask questions and get answers from our assistant."
    ```
-3. For better security, export the API key instead of storing it in Git-tracked files:
+
+   To keep using the direct API flow, leave `integration: "api"` and supply the Open WebUI settings (base URL, default model, API key).
+3. For better security, export sensitive keys instead of storing them in Git-tracked files:
    ```bash
    export OPEN_WEBUI_API_KEY="your-generated-key"
    ```
 4. Restart HomeHub (`docker compose restart`) and a **Chat with LLM** button will appear in the sidebar for authenticated users.
 
-Every visit creates or resumes a unique Open WebUI chat that’s stored per HomeHub user—family members can hop back into previous conversations without seeing anyone else’s history, while responses continue to leverage your existing Open WebUI workflows (model selection, policies, logging, etc.).
+When embedding, the iframe/widget handles login with the provider. In API mode, each visit creates or resumes a unique Open WebUI chat that’s stored per HomeHub user—family members can hop back into previous conversations without seeing anyone else’s history.
 
 ### First Run - Setting Up Passwords
 

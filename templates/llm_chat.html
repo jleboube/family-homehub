@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block extra_head %}
+{% if llm_chat_settings.integration == 'api' %}
 <style>
 .chat-bubble{
     max-width: 85%;
@@ -17,8 +18,68 @@
 .chat-log::-webkit-scrollbar-thumb{background:rgba(148,163,184,0.6); border-radius:4px;}
 #llmMessage{resize:none;}
 </style>
+{% elif llm_chat_settings.integration in ['iframe', 'widget'] %}
+<style>
+.embed-chat-frame{
+    width: 100%;
+    min-height: 70vh;
+    border: none;
+    border-radius: 1rem;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+.embed-chat-card{
+    background: var(--card-background-color);
+    border-radius: 1.5rem;
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+    padding: 2rem;
+}
+</style>
+{% endif %}
 {% endblock %}
 {% block content %}
+{% set integration = llm_chat_settings.integration %}
+{% if integration in ['iframe', 'widget'] %}
+<div class="flex flex-col gap-6">
+    <div class="embed-chat-card space-y-4">
+        <div class="flex items-start gap-4">
+            <div class="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500 text-white text-2xl shadow-lg">
+                <i class="fa-solid fa-robot"></i>
+            </div>
+            <div class="flex-1">
+                <h1 class="text-2xl font-bold mb-1">{{ llm_chat_settings.page_title }}</h1>
+                {% if llm_chat_settings.description %}
+                <p class="text-gray-600">{{ llm_chat_settings.description }}</p>
+                {% else %}
+                <p class="text-gray-600">Launch the family assistant in a secure embedded window.</p>
+                {% endif %}
+                <div class="mt-3 inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-sm text-emerald-700">
+                    <i class="fa-solid fa-shield-check"></i>
+                    Authenticated session required
+                </div>
+            </div>
+        </div>
+        <div class="border border-slate-200 rounded-2xl overflow-hidden bg-white/70">
+            {% if integration == 'iframe' %}
+            <iframe
+                src="{{ llm_chat_settings.embed_url }}"
+                class="embed-chat-frame"
+                title="Family Assistant Chat"
+                allow="clipboard-write"
+            ></iframe>
+            {% elif integration == 'widget' %}
+            <div class="flex items-center justify-center bg-slate-50" style="min-height: 70vh;">
+                <div id="embeddedChatWidget" class="w-full max-w-3xl px-4"></div>
+            </div>
+            <script
+                src="{{ llm_chat_settings.widget_script }}"
+                data-customchatai-key="{{ llm_chat_settings.api_key }}"
+                data-customchatai-theme="{{ llm_chat_settings.theme | default('dark') }}"
+            ></script>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% else %}
 <div class="flex flex-col md:flex-row gap-6">
     <aside class="md:w-72 flex-shrink-0 space-y-4">
         <div class="card p-4 space-y-3">
@@ -85,6 +146,8 @@
         </div>
     </div>
 </div>
+{% endif %}
+{% if integration == 'api' %}
 <script>
 (function(){
     const state = {
@@ -199,39 +262,27 @@
                 return resp.json();
             })
             .then(data => {
-                state.chatId = data.chat_id || state.chatId;
-                const messages = Array.isArray(data.messages) ? data.messages : [];
-                if(messages.length){
-                    if(emptyEl){ emptyEl.remove(); }
-                    messages.forEach(msg => appendMessage(msg.role || 'assistant', msg.content || ''));
-                } else if(emptyEl && !logEl.contains(emptyEl)){
-                    emptyEl.classList.remove('hidden');
-                    emptyEl.textContent = 'Ask your first question to begin. The assistant will respond here.';
-                    logEl.appendChild(emptyEl);
+                if(!data || !data.messages){
+                    if(window.globalToast){ globalToast('No chat history returned.', 'info'); }
+                    return;
                 }
-                const session = state.sessions.get(state.chatId) || { chat_id: state.chatId };
-                if(data.title){
-                    session.title = data.title;
-                    setSessionTitle(data.title);
-                } else if(session.title){
-                    setSessionTitle(session.title);
-                } else {
-                    setSessionTitle('Conversation');
-                }
-                session.last_used = new Date().toISOString();
-                state.sessions.set(session.chat_id, session);
-                renderSessions();
+                logEl.innerHTML = '';
+                data.messages.forEach(msg => {
+                    if(msg.role === 'user' || msg.role === 'assistant'){
+                        appendMessage(msg.role, msg.content || '');
+                    }
+                });
+                setSessionTitle(data.title);
             })
             .catch(err => {
                 console.error(err);
-                if(window.globalToast){ globalToast('Unable to load previous chat messages.', 'error'); }
+                if(window.globalToast){ globalToast(err.message || 'Unable to load chat history.', 'error'); }
             });
     }
 
     function sendMessage(text){
-        toggleLoading(true);
         appendMessage('user', text);
-        messageEl.value = '';
+        toggleLoading(true);
         fetch('/api/llm/chat/send', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -359,4 +410,5 @@
     loadHistory();
 })();
 </script>
+{% endif %}
 {% endblock %}

@@ -2815,6 +2815,9 @@ def _llm_settings():
     from flask import g
     config = current_app.config['HOMEHUB_CONFIG']
     llm_cfg = config.get('llm_chat') or {}
+    integration_mode = (llm_cfg.get('integration') or 'api').lower()
+    if integration_mode != 'api':
+        abort(404, description='LLM chat API endpoints are disabled for the current integration mode.')
     if not llm_cfg.get('enabled'):
         abort(404)
     user = getattr(g, 'current_user', None)
@@ -2861,11 +2864,12 @@ def _serialize_llm_session(session_obj):
 
 def _create_llm_chat(base_url, headers, user):
     """Create a new chat session via Open WebUI, persist it, and return the model."""
+    payload = {'title': 'Conversation'}
     try:
         resp = requests.post(
-            f'{base_url}/api/chat/sessions',
+            f'{base_url}/api/v1/chats/new',
             headers=headers,
-            json={},
+            json=payload,
             timeout=10,
         )
         resp.raise_for_status()
@@ -2896,6 +2900,47 @@ def _create_llm_chat(base_url, headers, user):
 
 @main_bp.route('/llm-chat')
 def llm_chat():
+    from flask import g
+    config = current_app.config['HOMEHUB_CONFIG']
+    llm_cfg = config.get('llm_chat') or {}
+    if not llm_cfg.get('enabled'):
+        abort(404)
+    user = getattr(g, 'current_user', None)
+    if not user:
+        abort(401)
+
+    integration = (llm_cfg.get('integration') or 'api').lower()
+    page_title = llm_cfg.get('page_title') or 'Chat with LLM'
+    description = llm_cfg.get('description') or ''
+
+    if integration in ('iframe', 'widget'):
+        api_key = llm_cfg.get('api_key') or ''
+        api_key_env = llm_cfg.get('api_key_env') or ''
+        if not api_key and api_key_env:
+            api_key = os.getenv(api_key_env, '')
+        if not api_key:
+            abort(503, description='LLM chat API key is not configured.')
+        base_url = (llm_cfg.get('base_url') or 'https://chat.my-house.dev').rstrip('/')
+        theme = llm_cfg.get('theme') or 'dark'
+        embed_url = llm_cfg.get('embed_url')
+        if not embed_url:
+            embed_url = f'{base_url}/embed/chat?userKey={api_key}&theme={theme}'
+        widget_script = llm_cfg.get('widget_script') or f'{base_url}/widget.js'
+        return render_template(
+            'llm_chat.html',
+            config=config,
+            is_authed=True,
+            llm_chat_settings={
+                'page_title': page_title,
+                'description': description,
+                'integration': integration,
+                'embed_url': embed_url,
+                'theme': theme,
+                'widget_script': widget_script,
+                'api_key': api_key,
+            }
+        )
+
     base_url, headers, default_model, llm_cfg, user = _llm_settings()
     desired_chat = (request.args.get('chat') or session.get('llm_chat_id') or '').strip()
     force_new = request.args.get('reset') == '1'
@@ -2919,7 +2964,7 @@ def llm_chat():
     description = llm_cfg.get('description') or ''
     return render_template(
         'llm_chat.html',
-        config=current_app.config['HOMEHUB_CONFIG'],
+        config=config,
         is_authed=True,
         chat_id=record.chat_id,
         default_model=default_model,
@@ -2927,7 +2972,8 @@ def llm_chat():
         active_chat_id=record.chat_id,
         llm_chat_settings={
             'page_title': page_title,
-            'description': description
+            'description': description,
+            'integration': 'api'
         }
     )
 
@@ -2945,7 +2991,7 @@ def llm_chat_history():
     session['llm_chat_id'] = record.chat_id
     try:
         resp = requests.get(
-            f'{base_url}/api/chat/sessions/{chat_id}',
+            f'{base_url}/api/v1/chats/{chat_id}',
             headers=headers,
             timeout=10,
         )
