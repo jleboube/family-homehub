@@ -3119,12 +3119,21 @@ def llm_chat_send():
         data = resp.json() if resp.content else {}
     except Exception as exc:
         current_app.logger.exception('LLM chat completion failed: %s', exc)
-        if isinstance(exc, requests.exceptions.HTTPError) and exc.response is not None and exc.response.status_code == 404:
-            current_app.config['HOMEHUB_CONFIG']['llm_chat']['supports_remote_sessions'] = False
+        status_code = 502
+        message = 'Unable to get a response from the LLM service.'
+        if isinstance(exc, requests.exceptions.HTTPError) and exc.response is not None:
+            status = exc.response.status_code
+            if status == 404:
+                current_app.config['HOMEHUB_CONFIG']['llm_chat']['supports_remote_sessions'] = False
+                message = 'The LLM service does not support session-based conversations with the current configuration.'
+                status_code = 503
+            elif status == 401:
+                message = 'The LLM service rejected the API key. Update the key or switch to iframe/widget integration.'
+                status_code = 401
         if chat_log and chat_log[-1].get('role') == 'user':
             chat_log.pop()
             session.modified = True
-        abort(502, description='Unable to get a response from the LLM service.')
+        return jsonify({'success': False, 'description': message}), status_code
     assistant = None
     choices = data.get('choices') if isinstance(data.get('choices'), list) else None
     if choices:
