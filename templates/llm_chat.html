@@ -115,7 +115,21 @@
                             <i class="fa-solid fa-shield-check"></i>
                             Private family session
                         </span>
-                        {% if default_model %}
+                        {% set models = available_models if available_models is defined else [] %}
+                        {% if models %}
+                        <label for="llmModelSelect" class="inline-flex items-center gap-2 px-2 py-1 rounded-full bg-white border border-slate-200 text-slate-600">
+                            <i class="fa-solid fa-microchip"></i>
+                            <span class="sr-only">Choose model</span>
+                            <select id="llmModelSelect" class="bg-transparent border-none focus:outline-none text-sm font-medium text-slate-700">
+                                {% for model in models %}
+                                <option value="{{ model.id }}" {% if model.id == llm_chat_settings.selected_model %}selected{% endif %}>
+                                    {{ model.id }}
+                                    {% if model.owned_by %} ({{ model.owned_by }}){% endif %}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </label>
+                        {% elif default_model %}
                         <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-slate-100 text-slate-700 border border-slate-200" id="llmDefaultModel">
                             <i class="fa-solid fa-microchip"></i>
                             Model: {{ default_model }}
@@ -152,7 +166,7 @@
 (function(){
     const state = {
         chatId: {{ chat_id | tojson }},
-        model: {{ default_model | tojson }},
+        model: {{ llm_chat_settings.selected_model | default(default_model) | tojson }},
         loading: false,
         sessions: new Map(),
         currentTitle: 'Conversation'
@@ -174,6 +188,19 @@
     const sessionsWrap = document.getElementById('llmSessionList');
     const sessionsEmpty = document.getElementById('llmSessionsEmpty');
     const titleEl = document.getElementById('llmSessionTitle');
+    const modelSelect = document.getElementById('llmModelSelect');
+
+    if(modelSelect){
+        if(!state.model){
+            state.model = modelSelect.value || '';
+        }
+        modelSelect.addEventListener('change', function(ev){
+            const nextModel = ev.target.value || '';
+            if(nextModel){
+                state.model = nextModel;
+            }
+        });
+    }
 
     function toggleLoading(isLoading){
         state.loading = isLoading;
@@ -281,6 +308,10 @@
     }
 
     function sendMessage(text){
+        if(!state.model){
+            if(window.globalToast){ globalToast('Select an AI model before chatting.', 'warning'); }
+            return;
+        }
         appendMessage('user', text);
         toggleLoading(true);
         fetch('/api/llm/chat/send', {

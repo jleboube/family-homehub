@@ -2853,6 +2853,34 @@ def _resolve_llm_configuration():
     return config, llm_cfg, api_key
 
 
+def _fetch_llm_models(base_url, headers):
+    """Fetch available models from the LLM service."""
+    try:
+        resp = requests.get(
+            f'{base_url}/api/v1/models',
+            headers=headers,
+            timeout=10,
+        )
+        resp.raise_for_status()
+        data = resp.json() if resp.content else {}
+    except Exception as exc:
+        current_app.logger.warning('Unable to fetch LLM models: %s', exc)
+        return []
+    models = []
+    if isinstance(data, dict):
+        items = data.get('data')
+        if isinstance(items, list):
+            for item in items:
+                if isinstance(item, dict) and item.get('id'):
+                    models.append({
+                        'id': item.get('id'),
+                        'label': item.get('id'),
+                        'owned_by': item.get('owned_by'),
+                        'description': item.get('object'),
+                    })
+    return models
+
+
 def _llm_settings():
     """Fetch LLM chat configuration and authenticated user."""
     from flask import g
@@ -2975,6 +3003,7 @@ def llm_chat():
             'llm_chat.html',
             config=config,
             is_authed=True,
+            available_models=[],
             llm_chat_settings={
                 'page_title': page_title,
                 'description': description,
@@ -2983,10 +3012,18 @@ def llm_chat():
                 'theme': theme,
                 'widget_script': widget_script,
                 'api_key': api_key,
+                'selected_model': '',
             }
         )
 
     base_url, headers, default_model, llm_cfg, user = _llm_settings()
+    available_models = _fetch_llm_models(base_url, headers)
+    model_ids = [m['id'] for m in available_models]
+    selected_model = default_model or (model_ids[0] if model_ids else '')
+    if selected_model and selected_model not in model_ids:
+        selected_model = model_ids[0] if model_ids else selected_model
+    if not default_model and selected_model:
+        default_model = selected_model
     desired_chat = (request.args.get('chat') or session.get('llm_chat_id') or '').strip()
     force_new = request.args.get('reset') == '1'
 
@@ -3017,10 +3054,12 @@ def llm_chat():
         default_model=default_model,
         chat_sessions=serialized_sessions,
         active_chat_id=record.chat_id,
+        available_models=available_models,
         llm_chat_settings={
             'page_title': page_title,
             'description': description,
-            'integration': 'api'
+            'integration': 'api',
+            'selected_model': selected_model,
         }
     )
 
@@ -3099,6 +3138,12 @@ def llm_chat_send():
     }
     chat_log.append({'role': 'user', 'content': user_message})
     session.modified = True
+    current_app.logger.info('Sending LLM chat request', extra={
+        'llm_model': model,
+        'chat_id': chat_id,
+        'message_count': len(body['messages']),
+        'remote_base': base_url,
+    })
     def _post_completion(url):
         return requests.post(
             url,
